@@ -1861,9 +1861,34 @@ const actions = {
 async function fileToDataUrl(file) {
   return new Promise((resolve) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onload = () => {
+      const dataUrl = String(reader.result || "");
+      // 手机拍照 data URL 可能超过 localStorage 5MB 限制，强制压缩
+      if (dataUrl.length > 200 * 1024) {
+        compressImage(file, (compressed) => resolve(compressed), 800);
+      } else {
+        resolve(dataUrl);
+      }
+    };
     reader.readAsDataURL(file);
   });
+}
+
+function compressImage(file, callback, maxWidth) {
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    const canvas = document.createElement("canvas");
+    let w = img.width, h = img.height;
+    if (w > maxWidth) { h = (h * maxWidth) / w; w = maxWidth; }
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, w, h);
+    // 用 JPEG 质量 0.6 大幅减小体积
+    callback(canvas.toDataURL("image/jpeg", 0.6));
+  };
+  img.src = url;
 }
 
 // Recognize 页面 slider UI：实时更新旁边的百分比

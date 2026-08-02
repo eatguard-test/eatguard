@@ -2256,9 +2256,8 @@ function showActionSheet() {
     console.log("[EatGuard] 图片已选择:", file.name, file.size, "bytes");
     fileToDataUrl(file).then((url) => {
       state.draft = { photoUrl: url, items: pickSimulatedItems(), eatenPercentage: 100 };
-      navigate("capture");
-      // 延迟 toast 避免被 navigate 冲掉
-      setTimeout(() => setToast("照片已选择"), 100);
+      render();
+      setTimeout(() => setToast("照片已选择"), 200);
     }).catch((err) => {
       console.error("[EatGuard] 图片处理失败:", err);
       setToast("图片处理失败，请重试。");

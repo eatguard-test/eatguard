@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover"/>
 <meta name="theme-color" content="#F0F4F1"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
@@ -21,14 +21,23 @@
   --rose: #c97a86;
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 html,
 body {
   height: 100%;
+  width: 100%;
+  overflow-x: hidden;
 }
 
-/* 让全屏渐变更“安静”一些 */
+/* 让全屏渐变更"安静"一些 */
 body {
   background: linear-gradient(180deg, var(--bg0) 0%, var(--bg1) 100%);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 /* iOS 安全区：底部 tab / FAB 不会被 Home Indicator 挡住 */
@@ -87,10 +96,60 @@ body {
   filter: drop-shadow(0 10px 22px rgba(15, 23, 42, 0.10));
 }
 
+/* 底部 Action Sheet */
+.action-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.action-sheet-panel {
+  width: 100%;
+  max-width: 480px;
+  background: #fff;
+  border-radius: 1.25rem 1.25rem 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: slideUp 0.25s ease;
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.action-sheet-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 1rem;
+  font-size: 1rem;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  color: var(--brand);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+.action-sheet-item:active {
+  background: #f0f4f1;
+}
+.action-sheet-cancel {
+  color: #999;
+  font-weight: 400;
+  border-bottom: none;
+  margin-top: 0.5rem;
+}
 
-.radio-opt-selected { border-color: var(--brand) !important; background: #F0FDF4 !important; }
-.radio-opt-selected .radio-dot { border-color: var(--brand) !important; }
-.radio-opt-selected .radio-dot-inner { opacity: 1 !important; background: var(--brand) !important; }
+
 </style>
 <script>
 window.tailwind={theme:{extend:{fontFamily:{sans:["Inter","ui-sans-serif","system-ui"]},colors:{brand:{DEFAULT:"#4A7C59","50":"#EDF4EF","100":"#D8E7DD","200":"#B6D1BF","300":"#94BBA1","400":"#6E9E7B","500":"#4A7C59","600":"#3F6F50","700":"#335A40","800":"#274530","900":"#1E3324"},calm:{bg0:"#F0F4F1",bg1:"#FAF9F6",amber:"#D9A441",rose:"#C97A86",sage:"#4A7C59"}},boxShadow:{soft:"0 8px 24px rgba(15,23,42,0.06)"},borderRadius:{"2xl":"1.25rem"}}}};
@@ -323,9 +382,9 @@ async function dbGetProfile(userId) {
 async function dbInsertMeal(meal) {
   const sb = getSupabaseClient();
   if (!sb) {
-    const meals = lsGet(LS_KEYS.meals, []);
+    const meals = safeReadLocalMeals();
     meals.push(meal);
-    lsSet(LS_KEYS.meals, meals);
+    safeWriteLocalMeals(meals);
     return meal;
   }
 
@@ -333,17 +392,26 @@ async function dbInsertMeal(meal) {
   const { data, error } = await sb.from("meals").insert(meal).select().single();
   if (error) {
     console.warn("Supabase insert meal failed, fallback to local.", error);
-    const meals = lsGet(LS_KEYS.meals, []);
+    const meals = safeReadLocalMeals();
     meals.push(meal);
-    lsSet(LS_KEYS.meals, meals);
+    safeWriteLocalMeals(meals);
     return meal;
   }
 
   // 同步缓存
-  const meals = lsGet(LS_KEYS.meals, []);
+  const meals = safeReadLocalMeals();
   meals.push(data);
-  lsSet(LS_KEYS.meals, meals);
+  safeWriteLocalMeals(meals);
   return data;
+}
+
+function safeReadLocalMeals() {
+  try { return lsGet(LS_KEYS.meals, []); }
+  catch (e) { console.warn("[EatGuard] 读取 meals 失败:", e); return []; }
+}
+function safeWriteLocalMeals(meals) {
+  try { lsSet(LS_KEYS.meals, meals); }
+  catch (e) { console.warn("[EatGuard] 写入 meals 失败:", e); }
 }
 
 async function dbListMeals(userId) {
@@ -777,8 +845,8 @@ function Ring({ percent, size = 240, stroke = 14, labelTop, labelMain, labelSub,
 
   return `
     <div class="flex flex-col items-center">
-      <div class="ring-shadow relative" style="width:${size}px;height:${size}px">
-        <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <div class="ring-shadow relative flex-shrink-0" style="width:${size}px;height:${size}px">
+        <svg width="100%" height="100%" viewBox="0 0 ${size} ${size}">
           <defs>
             <linearGradient id="${gradId}" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stop-color="${ringColor}" stop-opacity="0.85"></stop>
@@ -798,7 +866,7 @@ function Ring({ percent, size = 240, stroke = 14, labelTop, labelMain, labelSub,
             transform="rotate(-90 ${size / 2} ${size / 2})"
           ></circle>
         </svg>
-        <div class="absolute inset-0 flex flex-col items-center justify-center text-center px-8">
+        <div class="absolute inset-0 flex flex-col items-center justify-center text-center px-8" style="width:${size}px;height:${size}px">
           <div class="text-xs text-slate-500">${escapeHtml(labelTop || "")}</div>
           <div class="text-3xl font-semibold tracking-tight mt-1">${labelMain || ""}</div>
           ${labelSub ? `<div class="text-sm text-slate-500 mt-2">${labelSub}</div>` : ""}
@@ -927,7 +995,7 @@ function bindClicks() {
 // -----------------------------
 function PageShell({ title, body, activeTab, fab = false, rightHtml = "" }) {
   return `
-    <div class="mx-auto max-w-[480px] min-h-dvh pb-[92px]">
+    <div class="mx-auto max-w-[480px] w-full min-h-dvh pb-[92px] overflow-x-hidden">
       ${TopBar({ title, rightHtml })}
       <div class="px-4 pb-6">${body}</div>
     </div>
@@ -1222,6 +1290,11 @@ function CapturePage() {
     ? "拍下这一餐，我们会在你确认比例后，再给你一个温和提醒。"
     : "拍下这一餐就好。观察期只记录，不会给任何建议。";
 
+  // 已选择图片的预览
+  const preview = state.draft?.photoUrl
+    ? `<img src="${escapeHtml(state.draft.photoUrl)}" class="w-full rounded-2xl object-cover max-h-[240px]" />`
+    : "";
+
   return PageShell({
     title: "拍照记录",
     activeTab: "home",
@@ -1233,21 +1306,17 @@ function CapturePage() {
           <div class="text-sm text-slate-700 leading-relaxed">${note}</div>
         `,
       })}
-      <div class="mt-4 grid gap-3">
-        <label class="tap w-full py-4 rounded-2xl font-medium btn-primary flex items-center justify-center gap-2" for="photoInputCamera">
-          📷 拍照
-        </label>
-        <label class="tap w-full py-4 rounded-2xl font-medium btn-ghost flex items-center justify-center gap-2" for="photoInputGallery">
-          🖼️ 从相册选择
-        </label>
+      ${preview ? `<div class="mt-4">${preview}</div>` : ""}
+      <div class="mt-4">
+        <button id="btnOpenActionSheet" class="tap w-full py-4 rounded-2xl font-medium btn-primary flex items-center justify-center gap-2">
+          ${state.draft?.photoUrl ? "🔄 重新选择" : "📷 拍照 / 选择照片"}
+        </button>
       </div>
-      <input id="photoInputCamera" type="file" accept="image/*" capture="environment" class="hidden" />
-      <input id="photoInputGallery" type="file" accept="image/*" class="hidden" />
       <div class="text-xs text-slate-500 mt-3 leading-relaxed text-center">
-        提示：也可以在电脑上直接选择照片，然后点下方按钮继续。
+        提示：也可以不选照片，直接点下方按钮继续识别（将对白屏估算）。
       </div>
       <div class="mt-4">
-        ${Button({ label: "下一步：查看识别结果（也可以先不选照片）", onClick: "toRecognize", variant: "primary" })}
+        ${Button({ label: "下一步：查看识别结果", onClick: "toRecognize", variant: "ghost" })}
       </div>
     `,
   });
@@ -1678,13 +1747,8 @@ const actions = {
   },
 
   async toRecognize() {
-    const cam = $app.querySelector("#photoInputCamera");
-    const gal = $app.querySelector("#photoInputGallery");
-    const file = cam?.files?.[0] || gal?.files?.[0];
-    if (file) {
-      const url = await fileToDataUrl(file);
-      state.draft = { photoUrl: url, items: pickSimulatedItems(), eatenPercentage: 100 };
-    } else if (!state.draft?.photoUrl) {
+    // 新方案已通过 action sheet 处理图片，draft 中已有 photoUrl
+    if (!state.draft) {
       state.draft = { photoUrl: "", items: pickSimulatedItems(), eatenPercentage: 100 };
     }
     navigate("recognize");
@@ -1705,25 +1769,39 @@ const actions = {
       return;
     }
 
+    console.log("[EatGuard] saveMeal 开始, items:", d.items.length, "photoUrl长度:", (d.photoUrl || "").length);
+
     try {
       const dateStr = todayStr();
       const eatenPercentage = clamp(Number(d.eatenPercentage || 100), 10, 100);
       const total = round(calcMealTotal(d.items, eatenPercentage));
 
+      // 压缩大图片避免 localStorage 溢出（iPad/手机拍照可达 3-5MB）
+      let photoUrl = d.photoUrl || "";
+      if (photoUrl.length > 500 * 1024) {
+        console.log("[EatGuard] 照片过大(" + Math.round(photoUrl.length / 1024) + "KB)，压缩中...");
+        try {
+          photoUrl = await compressImageFromDataUrl(photoUrl, 400);
+          console.log("[EatGuard] 压缩完成: " + Math.round(photoUrl.length / 1024) + "KB");
+        } catch (e) {
+          console.warn("[EatGuard] 压缩失败，使用原图:", e);
+        }
+      }
+
       const meal = {
         id: uid(),
         user_id: state.userId,
-        photo_url: d.photoUrl || "",
+        photo_url: photoUrl,
         food_items: d.items,
         eaten_percentage: eatenPercentage,
         meal_total_calories: total,
         created_at: new Date().toISOString(),
       };
 
-      // 1) 先写入 meal
+      // 写入 meal（内部已有 try-catch + localStorage 降级）
       await dbInsertMeal(meal);
 
-      // 2) 累加当天 actual_calories
+      // 累加当天 actual_calories
       const row = await ensureTodayRows(state.userId, state.profile, dateStr);
       const nextRow = {
         ...row,
@@ -1732,19 +1810,32 @@ const actions = {
       };
       await dbUpsertDailyTarget(nextRow);
 
-      // 3) 基线完成判定（如果到了第 8 天）
+      // 基线完成判定（如果到了第 8 天）
       state.profile = await maybeCompleteBaseline(state.userId, state.profile, dateStr);
 
-      // 4) 活跃期兜底生成今日目标
+      // 活跃期兜底生成今日目标
       await ensureTodayTarget(state.userId, state.profile, dateStr);
 
       await reloadData();
       state.draft = null;
       setToast("已保存。谢谢你认真记录。");
       navigate("home");
+      console.log("[EatGuard] saveMeal 完成");
     } catch (err) {
-      console.error("saveMeal 失败:", err);
-      setToast("保存出错了，请再试一次。");
+      console.error("[EatGuard] saveMeal 失败:", err);
+      // 降级：尝试存到内存，下次刷新页面会丢失但当前可用
+      if (typeof state._memMeals === "undefined") state._memMeals = [];
+      const total = round(calcMealTotal(d.items, clamp(Number(d.eatenPercentage || 100), 10, 100)));
+      state._memMeals.push({
+        id: uid(),
+        user_id: state.userId,
+        photo_url: d.photoUrl || "",
+        food_items: d.items,
+        eaten_percentage: clamp(Number(d.eatenPercentage || 100), 10, 100),
+        meal_total_calories: total,
+        created_at: new Date().toISOString(),
+      });
+      setToast("保存到本地失败，数据暂存于内存中。请勿关闭页面，我们会持续尝试。");
     }
   },
 
@@ -1859,16 +1950,20 @@ const actions = {
 };
 
 async function fileToDataUrl(file) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = String(reader.result || "");
-      // 手机拍照 data URL 可能超过 localStorage 5MB 限制，强制压缩
+      // 手机/iPad 拍照 data URL 可能超过 localStorage 5MB 限制，强制压缩
       if (dataUrl.length > 200 * 1024) {
-        compressImage(file, (compressed) => resolve(compressed), 800);
+        compressImage(file, (compressed) => resolve(compressed), 1200);
       } else {
         resolve(dataUrl);
       }
+    };
+    reader.onerror = () => {
+      console.error("[EatGuard] FileReader 读取失败");
+      reject(new Error("FileReader error"));
     };
     reader.readAsDataURL(file);
   });
@@ -1888,7 +1983,34 @@ function compressImage(file, callback, maxWidth) {
     // 用 JPEG 质量 0.6 大幅减小体积
     callback(canvas.toDataURL("image/jpeg", 0.6));
   };
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    console.error("[EatGuard] 图片加载失败，返回原始文件");
+    // 降级：重新用 FileReader 读取（不加压缩）
+    const reader = new FileReader();
+    reader.onload = () => callback(String(reader.result || ""));
+    reader.onerror = () => callback("");
+    reader.readAsDataURL(file);
+  };
   img.src = url;
+}
+
+/* 从 data URL 压缩图片（用于 saveMeal 前的大图压缩） */
+function compressImageFromDataUrl(dataUrl, maxWidth) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      let w = img.width, h = img.height;
+      if (w > maxWidth) { h = (h * maxWidth) / w; w = maxWidth; }
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.5));
+    };
+    img.onerror = () => reject(new Error("图片加载失败"));
+    img.src = dataUrl;
+  });
 }
 
 // Recognize 页面 slider UI：实时更新旁边的百分比
@@ -1969,23 +2091,102 @@ function bindRadioGroups() {
 }
 
 function bindCaptureButtons() {
-  const inputCamera = $app.querySelector("#photoInputCamera");
-  const inputGallery = $app.querySelector("#photoInputGallery");
+  const btn = $app.querySelector("#btnOpenActionSheet");
+  if (!btn) return;
+
+  btn.addEventListener("click", showActionSheet);
+  btn.addEventListener("touchend", (e) => { e.preventDefault(); showActionSheet(); });
+}
+
+function showActionSheet() {
+  // 移除旧的面板
+  const old = $app.querySelector(".action-sheet-overlay");
+  if (old) old.remove();
+
+  const overlay = document.createElement("div");
+  overlay.className = "action-sheet-overlay";
+  overlay.innerHTML = `
+    <div class="action-sheet-panel">
+      <div class="action-sheet-item" id="asCamera">📷 拍照</div>
+      <div class="action-sheet-item" id="asGallery">🖼️ 从相册选择</div>
+      <div class="action-sheet-item action-sheet-cancel" id="asCancel">取消</div>
+    </div>
+  `;
+  $app.appendChild(overlay);
+
+  // 点击遮罩关闭
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  overlay.addEventListener("touchend", (e) => {
+    if (e.target === overlay) { e.preventDefault(); overlay.remove(); }
+  });
 
   const handleFile = async (input) => {
     const file = input?.files?.[0];
     if (file) {
-      const url = await fileToDataUrl(file);
-      state.draft = { photoUrl: url, items: pickSimulatedItems(), eatenPercentage: 100 };
-      setToast("照片已选择，点击下方按钮继续。");
+      console.log("[EatGuard] 图片已选择:", file.name, file.size, "bytes");
+      try {
+        const url = await fileToDataUrl(file);
+        state.draft = { photoUrl: url, items: pickSimulatedItems(), eatenPercentage: 100 };
+        setToast("照片已选择，点击下方按钮继续。");
+        // 重新渲染拍照页显示预览
+        navigate("capture");
+      } catch (err) {
+        console.error("[EatGuard] 图片处理失败:", err);
+        setToast("图片处理失败，请重试。");
+      }
     }
+    overlay.remove();
   };
 
-  if (inputCamera) {
-    inputCamera.addEventListener("change", () => handleFile(inputCamera));
+  // 拍照
+  const asCam = overlay.querySelector("#asCamera");
+  if (asCam) {
+    asCam.addEventListener("click", () => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
+      input.setAttribute("capture", "environment");
+      input.addEventListener("change", () => handleFile(input));
+      input.click();
+    });
+    asCam.addEventListener("touchend", (e) => {
+      e.preventDefault();
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
+      input.setAttribute("capture", "environment");
+      input.addEventListener("change", () => handleFile(input));
+      input.click();
+    });
   }
-  if (inputGallery) {
-    inputGallery.addEventListener("change", () => handleFile(inputGallery));
+
+  // 相册
+  const asGal = overlay.querySelector("#asGallery");
+  if (asGal) {
+    asGal.addEventListener("click", () => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
+      input.addEventListener("change", () => handleFile(input));
+      input.click();
+    });
+    asGal.addEventListener("touchend", (e) => {
+      e.preventDefault();
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
+      input.addEventListener("change", () => handleFile(input));
+      input.click();
+    });
+  }
+
+  // 取消
+  const asCancel = overlay.querySelector("#asCancel");
+  if (asCancel) {
+    asCancel.addEventListener("click", () => overlay.remove());
+    asCancel.addEventListener("touchend", (e) => { e.preventDefault(); overlay.remove(); });
   }
 }
 

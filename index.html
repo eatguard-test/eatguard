@@ -109,60 +109,6 @@ body {
   filter: drop-shadow(0 10px 22px rgba(15, 23, 42, 0.10));
 }
 
-/* 居中 Action Sheet */
-.action-sheet-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 999;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: asFadeIn 0.2s ease;
-}
-@keyframes asFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-.action-sheet-panel {
-  width: calc(100vw - 3rem);
-  max-width: 320px;
-  margin: 0 auto;
-  background: #fff;
-  border-radius: 1.25rem;
-  overflow: hidden;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.2);
-  animation: asScaleIn 0.25s ease;
-}
-@keyframes asScaleIn {
-  from { transform: scale(0.85); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-.action-sheet-item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 1rem;
-  font-size: 1.05rem;
-  font-weight: 500;
-  border: none;
-  background: transparent;
-  color: var(--brand);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-}
-.action-sheet-item:active {
-  background: #f0f4f1;
-}
-.action-sheet-cancel {
-  color: #999;
-  font-weight: 400;
-  border-bottom: none;
-}
-
 
 </style>
 <script>
@@ -1395,16 +1341,24 @@ function CapturePage() {
         `,
       })}
       ${preview ? `<div class="mt-4">${preview}</div>` : ""}
-      <div class="mt-4">
-        <button id="btnOpenActionSheet" class="tap w-full py-4 rounded-2xl font-medium btn-primary flex items-center justify-center gap-2">
-          ${state.draft?.photoUrl ? "🔄 重新选择照片" : "📷 拍照 / 选择照片"}
+      <div class="mt-5 grid gap-4">
+        <button id="btnCaptureCamera" class="tap w-full py-4 rounded-2xl font-medium btn-primary flex items-center justify-center gap-2" style="min-height:56px">
+          📷 直接拍照
+        </button>
+        <button id="btnCaptureGallery" class="tap w-full py-4 rounded-2xl font-medium btn-ghost flex items-center justify-center gap-2" style="min-height:56px;border-color:var(--brand);color:var(--brand)">
+          🖼️ 从手机选图
         </button>
       </div>
+      <input type="file" id="hiddenCameraInput" accept="image/*" capture="environment" style="position:absolute;left:-9999px;top:-9999px;opacity:0;pointer-events:none;width:1px;height:1px" />
+      <input type="file" id="hiddenGalleryInput" accept="image/*" style="position:absolute;left:-9999px;top:-9999px;opacity:0;pointer-events:none;width:1px;height:1px" />
       ${preview ? `<div class="mt-3 text-center text-sm text-brand font-medium">照片已选择 ✓</div>` : ""}
-      <div class="text-xs text-slate-500 mt-2 leading-relaxed text-center">
+      <div class="mt-4 text-center">
+        <button id="btnBackHome" class="tap text-sm font-medium" style="border:none;background:transparent;color:#999;padding:12px">取消</button>
+      </div>
+      <div class="text-xs text-slate-500 mt-1 leading-relaxed text-center">
         也可以不选照片，直接点下方按钮继续。
       </div>
-      <div class="mt-4">
+      <div class="mt-3">
         ${Button({ label: "下一步：查看识别结果", onClick: "toRecognize", variant: "ghost" })}
       </div>
     `,
@@ -2222,83 +2176,61 @@ function bindRadioGroups() {
 }
 
 function bindCaptureButtons() {
-  const btn = $app.querySelector("#btnOpenActionSheet");
-  if (!btn) return;
-  btn.addEventListener("click", showActionSheet);
-  btn.addEventListener("touchend", (e) => { e.preventDefault(); showActionSheet(); });
-}
+  const inputCamera = $app.querySelector("#hiddenCameraInput");
+  const inputGallery = $app.querySelector("#hiddenGalleryInput");
+  const btnCam = $app.querySelector("#btnCaptureCamera");
+  const btnGal = $app.querySelector("#btnCaptureGallery");
+  const btnBack = $app.querySelector("#btnBackHome");
 
-function showActionSheet() {
-  // 移除旧面板
-  const old = $app.querySelector(".action-sheet-overlay");
-  if (old) old.remove();
-
-  const overlay = document.createElement("div");
-  overlay.className = "action-sheet-overlay";
-  overlay.innerHTML = `
-    <div class="action-sheet-panel">
-      <div class="action-sheet-item" id="asCamera">📷 拍照</div>
-      <div class="action-sheet-item" id="asGallery">🖼️ 从相册选择</div>
-      <div class="action-sheet-item action-sheet-cancel" id="asCancel">取消</div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-
-  // 点击遮罩关闭
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) overlay.remove();
-  });
-
-  const pickFile = (input) => {
+  // 通用：处理文件选择
+  const handleFile = (input) => {
     const file = input?.files?.[0];
-    overlay.remove(); // 立即关闭弹窗
+    console.log("[EatGuard] change event, files:", input?.files?.length, file?.name);
     if (!file) return;
-    console.log("[EatGuard] 图片已选择:", file.name, file.size, "bytes");
+
+    // 先存 draft 再 render，确保页面刷新后能看到预览
     fileToDataUrl(file).then((url) => {
+      console.log("[EatGuard] dataUrl ready, length:", url.length);
       state.draft = { photoUrl: url, items: pickSimulatedItems(), eatenPercentage: 100 };
       render();
-      setTimeout(() => setToast("照片已选择"), 200);
+      setTimeout(() => setToast("照片已选择"), 300);
     }).catch((err) => {
       console.error("[EatGuard] 图片处理失败:", err);
       setToast("图片处理失败，请重试。");
     });
   };
 
-  // 拍照 → 直接调用相机
-  const asCam = overlay.querySelector("#asCamera");
-  if (asCam) {
-    const openCam = () => {
-      const input = document.createElement("input");
-      input.type = "file";
-      input.accept = "image/*";
-      input.setAttribute("capture", "environment");
-      input.addEventListener("change", () => pickFile(input));
-      input.click();
-    };
-    asCam.addEventListener("click", openCam);
-    asCam.addEventListener("touchend", (e) => { e.preventDefault(); openCam(); });
+  // 绑定两个隐藏 input 的 change 事件
+  if (inputCamera) {
+    inputCamera.addEventListener("change", () => handleFile(inputCamera));
+  }
+  if (inputGallery) {
+    inputGallery.addEventListener("change", () => handleFile(inputGallery));
   }
 
-  // 从相册选择 → 不带 capture，iOS 会弹出系统相册
-  const asGal = overlay.querySelector("#asGallery");
-  if (asGal) {
-    const openGal = () => {
-      const input = document.createElement("input");
-      input.type = "file";
-      input.accept = "image/*";
-      input.addEventListener("change", () => pickFile(input));
-      input.click();
-    };
-    asGal.addEventListener("click", openGal);
-    asGal.addEventListener("touchend", (e) => { e.preventDefault(); openGal(); });
+  // 拍照按钮 → 触发隐藏的相机 input
+  if (btnCam) {
+    btnCam.addEventListener("click", () => {
+      if (inputCamera) {
+        inputCamera.value = "";
+        inputCamera.click();
+      }
+    });
   }
 
-  // 取消
-  const asCancel = overlay.querySelector("#asCancel");
-  if (asCancel) {
-    const doCancel = () => overlay.remove();
-    asCancel.addEventListener("click", doCancel);
-    asCancel.addEventListener("touchend", (e) => { e.preventDefault(); doCancel(); });
+  // 从相册选图 → 触发隐藏的相册 input
+  if (btnGal) {
+    btnGal.addEventListener("click", () => {
+      if (inputGallery) {
+        inputGallery.value = "";
+        inputGallery.click();
+      }
+    });
+  }
+
+  // 取消 → 回到首页
+  if (btnBack) {
+    btnBack.addEventListener("click", () => navigate("home"));
   }
 }
 

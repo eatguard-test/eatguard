@@ -535,38 +535,77 @@ function sumItemsCalories(items) {
   return items.reduce((acc, it) => acc + Number(it.calories || 0), 0);
 }
 
+function sumItemsProtein(items) {
+  return items.reduce((acc, it) => acc + Number(it.protein || 0), 0);
+}
+
 function calcMealTotal(items, eatenPercentage) {
   const raw = sumItemsCalories(items);
   const factor = clamp(Number(eatenPercentage) / 100, 0.1, 1);
   return raw * factor;
 }
 
+function calcMealProtein(items, eatenPercentage) {
+  const raw = sumItemsProtein(items);
+  const factor = clamp(Number(eatenPercentage) / 100, 0.1, 1);
+  return round(raw * factor);
+}
+
+function calcDailyProteinTarget(profile) {
+  if (!profile) return 0;
+  const weight = Number(profile.weight || 0);
+  const age = Number(profile.age || 0);
+  const goal = profile.goal || "维持";
+  if (!weight) return 0;
+
+  let coef = 1.0;
+  if (goal === "减脂") coef = 1.4;
+  else if (goal === "增肌") coef = 1.8;
+  else coef = 1.0; // 维持
+
+  if (age >= 50) coef *= 1.1;
+  const target = Math.min(weight * coef, weight * 2.0);
+  return round(target);
+}
+
+function proteinProgressTone(actual, target) {
+  if (!target || target <= 0) return "green";
+  const ratio = actual / target;
+  if (ratio >= 0.8) return "green";
+  if (ratio >= 0.5) return "amber";
+  return "rose";
+}
+
+function formatGram(g) {
+  return Math.round(g);
+}
+
 function pickSimulatedItems() {
   // “逼真的模拟数据”：中餐常见菜 + 约略热量
   const pools = [
     [
-      { name: "米饭", amount: "约200g", calories: 230 },
-      { name: "红烧肉", amount: "约100g", calories: 280 },
-      { name: "清炒时蔬", amount: "约80g", calories: 90 },
+      { name: "米饭", amount: "约200g", calories: 230, protein: 5 },
+      { name: "红烧肉", amount: "约100g", calories: 280, protein: 18 },
+      { name: "清炒时蔬", amount: "约80g", calories: 90, protein: 3 },
     ],
     [
-      { name: "番茄炒蛋", amount: "约180g", calories: 260 },
-      { name: "米饭", amount: "约180g", calories: 210 },
-      { name: "紫菜蛋花汤", amount: "约1碗", calories: 70 },
+      { name: "番茄炒蛋", amount: "约180g", calories: 260, protein: 12 },
+      { name: "米饭", amount: "约180g", calories: 210, protein: 4 },
+      { name: "紫菜蛋花汤", amount: "约1碗", calories: 70, protein: 5 },
     ],
     [
-      { name: "宫保鸡丁", amount: "约160g", calories: 360 },
-      { name: "米饭", amount: "约200g", calories: 230 },
-      { name: "拍黄瓜", amount: "约120g", calories: 60 },
+      { name: "宫保鸡丁", amount: "约160g", calories: 360, protein: 28 },
+      { name: "米饭", amount: "约200g", calories: 230, protein: 5 },
+      { name: "拍黄瓜", amount: "约120g", calories: 60, protein: 2 },
     ],
     [
-      { name: "牛肉面", amount: "约1碗", calories: 540 },
-      { name: "凉拌海带丝", amount: "约100g", calories: 80 },
+      { name: "牛肉面", amount: "约1碗", calories: 540, protein: 22 },
+      { name: "凉拌海带丝", amount: "约100g", calories: 80, protein: 4 },
     ],
     [
-      { name: "麻婆豆腐", amount: "约180g", calories: 320 },
-      { name: "米饭", amount: "约150g", calories: 175 },
-      { name: "清蒸西兰花", amount: "约120g", calories: 70 },
+      { name: "麻婆豆腐", amount: "约180g", calories: 320, protein: 16 },
+      { name: "米饭", amount: "约150g", calories: 175, protein: 4 },
+      { name: "清蒸西兰花", amount: "约120g", calories: 70, protein: 5 },
     ],
   ];
   const idx = Math.floor(Math.random() * pools.length);
@@ -1220,6 +1259,40 @@ function HomePage() {
       `
       : "";
 
+  // 蛋白质统计
+  const proteinTarget = calcDailyProteinTarget(p);
+  const actualProtein = Math.round(
+    (() => {
+      const mealsToday = state.meals.filter((m) => todayStr(new Date(m.created_at)) === dateStr);
+      return mealsToday.reduce((acc, m) => acc + (Number(m.meal_total_protein) || 0), 0);
+    })()
+  );
+  const pTone = proteinProgressTone(actualProtein, proteinTarget);
+  const pColors = toneToColors(pTone);
+  const proteinPct = proteinTarget > 0 ? Math.min((actualProtein / proteinTarget) * 100, 100) : 0;
+  const proteinRemaining = Math.max(0, proteinTarget - actualProtein);
+
+  const proteinHintText = (() => {
+    if (proteinPct >= 80) return "蛋白质摄入充足，继续保持 💪";
+    if (proteinPct >= 50) return `今天还可以补充约 ${formatGram(proteinRemaining)}g 蛋白质，建议晚餐加一个鸡蛋或一杯牛奶`;
+    return "今天蛋白质摄入偏少，长期不足可能影响代谢，建议多吃鱼、肉、蛋、豆";
+  })();
+
+  const proteinCard = `
+    <div class="mt-3 card p-4">
+      <div class="flex items-center justify-between">
+        <div class="text-sm font-medium">🧬 蛋白质：已摄入 ${formatGram(actualProtein)}g / 目标 ${proteinTarget}g</div>
+        <div class="pill px-2 py-0.5 text-xs" style="background:${pColors.chipBg}; color:${pColors.chipText};">
+          ${pTone === "green" ? "充足" : pTone === "amber" ? "需补充" : "偏少"}
+        </div>
+      </div>
+      <div class="mt-3 h-2 w-full rounded-full bg-slate-200/60 overflow-hidden">
+        <div class="h-full rounded-full transition-all duration-500" style="width:${proteinPct}%;background:${pColors.ring}"></div>
+      </div>
+      ${!isB ? `<div class="text-xs text-slate-500 mt-2 leading-relaxed">${proteinHintText}</div>` : ""}
+    </div>
+  `;
+
   if (isB) {
     const ring = Ring({
       percent,
@@ -1251,6 +1324,7 @@ function HomePage() {
       body: `
         ${summaryCard}
         ${snackHint}
+        ${proteinCard}
         <div class="flex justify-center pt-2">${ring}</div>
         ${info}
       `,
@@ -1292,6 +1366,7 @@ function HomePage() {
     body: `
       ${summaryCard}
       ${snackHint}
+      ${proteinCard}
       <div class="flex justify-center pt-2">${ring}</div>
       ${status}
     `,
@@ -1343,16 +1418,21 @@ function RecognizePage() {
     : `<div class="rounded-2xl bg-white/70 border border-slate-200 p-4 text-sm text-slate-600">还没有选择照片。你可以先回上一步。</div>`;
 
   const items = (d?.items || []).map((it) => {
+    const p = Number(it.protein) || 0;
+    const proteinStr = p > 0 ? ` · 蛋白质 ${formatGram(p)}g` : "";
     return `
       <div class="flex items-start justify-between gap-3 py-2">
         <div>
           <div class="font-medium">${escapeHtml(it.name)}</div>
           <div class="text-xs text-slate-500 mt-1">${escapeHtml(it.amount)}</div>
         </div>
-        <div class="text-sm font-semibold text-slate-700">${formatKcal(it.calories)} kcal</div>
+        <div class="text-sm font-semibold text-slate-700 text-right">${formatKcal(it.calories)} kcal${proteinStr}</div>
       </div>
     `;
   });
+
+  const mealProtein = round(calcMealProtein(d?.items || [], d?.eatenPercentage ?? 100));
+  const proteinLine = mealProtein > 0 ? `<div class="text-xs text-slate-500 mt-2">本餐蛋白质合计：<span class="font-semibold">${formatGram(mealProtein)}g</span></div>` : "";
 
   return PageShell({
     title: "识别结果",
@@ -1366,6 +1446,7 @@ function RecognizePage() {
           inner: `
             <div class="text-sm text-slate-500">模拟 AI 识别（可编辑比例）</div>
             <div class="mt-2 divide-y divide-slate-200/70">${items.join("")}</div>
+            ${proteinLine}
             ${Divider()}
             <div class="text-sm font-medium">我吃了这顿的百分之多少</div>
             <div class="text-xs text-slate-500 mt-1">合餐制也没关系，用大概的比例就足够。</div>
@@ -1399,6 +1480,7 @@ function ReviewPage() {
   const d = state.draft || { items: [], eatenPercentage: 100 };
 
   const mealTotal = round(calcMealTotal(d.items || [], d.eatenPercentage || 100));
+  const mealProtein = round(calcMealProtein(d.items || [], d.eatenPercentage || 100));
   const todayRow = state.targets.find((t) => t.date === dateStr) || { actual_calories: 0, target_calories: null };
   const actual = todayRow.actual_calories ?? 0;
   const target = todayRow.target_calories ?? null;
@@ -1433,6 +1515,7 @@ function ReviewPage() {
           <div class="pill inline-flex px-3 py-1 text-sm font-semibold mt-1">${d.eatenPercentage}%</div>
         </div>
       </div>
+      <div class="text-xs text-slate-500 mt-2">本餐蛋白质合计：<span class="font-semibold">${formatGram(mealProtein)}g</span></div>
       ${Divider()}
       <div class="text-sm font-medium mb-2">明细</div>
       <div class="divide-y divide-slate-200/70">${items}</div>
@@ -1544,6 +1627,8 @@ function DayDetailPage(dateStr) {
           const hh = String(time.getHours()).padStart(2, "0");
           const mm = String(time.getMinutes()).padStart(2, "0");
           const items = (m.food_items || []).map((it) => `${it.name}`).join("、");
+          const p = Number(m.meal_total_protein) || 0;
+          const proteinStr = p > 0 ? ` · 蛋白质 ${formatGram(p)}g` : "";
           return `
             <div class="py-3">
               <div class="flex items-start justify-between gap-3">
@@ -1551,13 +1636,16 @@ function DayDetailPage(dateStr) {
                   <div class="font-medium">${hh}:${mm}</div>
                   <div class="text-xs text-slate-500 mt-1">${escapeHtml(items || "（无明细）")}</div>
                 </div>
-                <div class="text-sm font-semibold text-slate-700">${formatKcal(m.meal_total_calories)} kcal</div>
+                <div class="text-sm font-semibold text-slate-700 text-right">${formatKcal(m.meal_total_calories)} kcal${proteinStr}</div>
               </div>
             </div>
           `;
         })
         .join('<div class="h-px bg-slate-200/70"></div>')
     : `<div class="text-sm text-slate-600 py-6 text-center">这一天还没有记录。也没关系，明天再来。</div>`;
+
+  const dayProtein = meals.reduce((acc, m) => acc + (Number(m.meal_total_protein) || 0), 0);
+  const proteinFooter = meals.length ? `<div class="mt-3 text-xs text-slate-500 text-center">蛋白质合计：<span class="font-semibold">${formatGram(dayProtein)}g</span></div>` : "";
 
   return PageShell({
     title: "当天详情",
@@ -1567,7 +1655,7 @@ function DayDetailPage(dateStr) {
     body: `
       ${header}
       <div class="mt-4">
-        ${Card({ inner: list })}
+        ${Card({ inner: list + proteinFooter })}
       </div>
     `,
   });
@@ -1589,6 +1677,8 @@ function SettingsPage() {
       ? `系数 ×${activityCoeff}（标签未记录）`
       : "未设置";
 
+  const proteinTarget = calcDailyProteinTarget(p);
+
   const profileCard = Card({
     inner: `
       <div class="flex items-center justify-between">
@@ -1606,6 +1696,19 @@ function SettingsPage() {
       </div>
       <div class="mt-4">
         ${Button({ label: "修改活动量", onClick: "editActivity", variant: "ghost" })}
+      </div>
+    `,
+  });
+
+  const proteinCard = Card({
+    className: "mt-4",
+    inner: `
+      <div class="font-semibold">每日目标</div>
+      <div class="mt-2 text-sm text-slate-700">
+        蛋白质目标：<span class="font-semibold">${proteinTarget}g</span>（基于体重和目标自动计算）
+      </div>
+      <div class="text-xs text-slate-500 mt-2 leading-relaxed">
+        修改体重或目标后，蛋白质目标会自动重新计算。
       </div>
     `,
   });
@@ -1647,14 +1750,22 @@ function SettingsPage() {
     `,
   });
 
+  const disclaimer = `
+    <div class="mt-4 text-xs text-slate-400 text-center leading-relaxed px-4">
+      本应用中的营养建议基于一般膳食指南，仅供参考，不能替代医生或注册营养师的专业建议。如有特殊健康状况，请咨询专业人士。
+    </div>
+  `;
+
   return PageShell({
     title: "设置",
     activeTab: "settings",
     fab: false,
     body: `
       ${profileCard}
+      ${proteinCard}
       ${baselineCard}
       ${tech}
+      ${disclaimer}
     `,
   });
 }
@@ -1789,6 +1900,7 @@ const actions = {
       const dateStr = todayStr();
       const eatenPercentage = clamp(Number(d.eatenPercentage || 100), 10, 100);
       const total = round(calcMealTotal(d.items, eatenPercentage));
+      const totalProtein = round(calcMealProtein(d.items, eatenPercentage));
 
       // 压缩大图片避免 localStorage 溢出（iPad/手机拍照可达 3-5MB）
       let photoUrl = d.photoUrl || "";
@@ -1809,8 +1921,11 @@ const actions = {
         food_items: d.items,
         eaten_percentage: eatenPercentage,
         meal_total_calories: total,
+        meal_total_protein: totalProtein,
         created_at: new Date().toISOString(),
       };
+
+      console.log("[EatGuard] meal 总蛋白质:", totalProtein, "g");
 
       // 写入 meal（内部已有 try-catch + localStorage 降级）
       await dbInsertMeal(meal);
@@ -1840,6 +1955,7 @@ const actions = {
       // 降级：尝试存到内存，下次刷新页面会丢失但当前可用
       if (typeof state._memMeals === "undefined") state._memMeals = [];
       const total = round(calcMealTotal(d.items, clamp(Number(d.eatenPercentage || 100), 10, 100)));
+      const totalP = round(calcMealProtein(d.items, clamp(Number(d.eatenPercentage || 100), 10, 100)));
       state._memMeals.push({
         id: uid(),
         user_id: state.userId,
@@ -1847,6 +1963,7 @@ const actions = {
         food_items: d.items,
         eaten_percentage: clamp(Number(d.eatenPercentage || 100), 10, 100),
         meal_total_calories: total,
+        meal_total_protein: totalP,
         created_at: new Date().toISOString(),
       });
       setToast("保存到本地失败，数据暂存于内存中。请勿关闭页面，我们会持续尝试。");

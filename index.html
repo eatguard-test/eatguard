@@ -135,7 +135,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260803121338";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260803124026";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -1482,7 +1482,10 @@ function QuickRecordPage() {
 
   function buildRow(f, isCustom) {
     var p = Number(f.protein) || 0;
-    var ps = p > 0 ? " · 蛋白质 " + formatGram(p) + "g" : "";
+    var calNum = Number(f.calories) || 0;
+    // 热量/蛋白质为 0 时显示 "--"（用户没填）
+    var calStr = calNum > 0 ? formatKcal(calNum) + " kcal" : "-- kcal";
+    var ps = p > 0 ? " · 蛋白质 " + formatGram(p) + "g" : (f.calories > 0 ? " · 蛋白质 -- g" : " · 蛋白质 -- g");
     var emoji = f.emoji || (isCustom ? "⭐" : "🍽️");
     var customAttr = isCustom ? ' data-custom="1"' : "";
     return '<div class="qr-food-row tap" data-name="' + escapeHtml(f.name) + '" data-amount="' + escapeHtml(f.amount || "") + '" data-cal="' + f.calories + '" data-protein="' + (f.protein || 0) + '"' + customAttr + ' style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(15,23,42,0.06);cursor:pointer;min-height:56px">'
@@ -1491,7 +1494,7 @@ function QuickRecordPage() {
       + '<div><div class="font-medium text-sm">' + escapeHtml(f.name) + '</div>'
       + (f.amount ? '<div class="text-xs text-slate-500">' + escapeHtml(f.amount) + '</div>' : '')
       + '</div></div>'
-      + '<div class="text-xs text-slate-600 text-right">' + formatKcal(f.calories) + ' kcal' + ps + '</div></div>';
+      + '<div class="text-xs text-slate-600 text-right">' + calStr + ps + '</div></div>';
   }
 
   var rows = foods.map(function(f) { return buildRow(f, false); }).join("");
@@ -1538,7 +1541,7 @@ function QuickRecordConfirmModal(food, isCustom) {
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">',
     '<span style="font-size:32px">' + escapeHtml(emoji) + '</span>',
     '<div><div class="font-semibold">' + escapeHtml(name) + '</div>',
-    '<div class="text-xs text-slate-500">' + escapeHtml(amount) + ' · ' + formatKcal(food.calories) + ' kcal · 蛋白质 ' + formatGram(food.protein || 0) + 'g</div></div></div>',
+    '<div class="text-xs text-slate-500">' + escapeHtml(amount) + ' · ' + (Number(food.calories) > 0 ? formatKcal(food.calories) + ' kcal' : '热量：-- kcal') + ' · 蛋白质 ' + (Number(food.protein) > 0 ? formatGram(food.protein) + 'g' : '-- g') + '</div></div></div>',
     '<div class="text-sm text-slate-700 mb-3">选择数量：</div>',
     '<div style="display:flex;gap:8px;margin-bottom:12px">',
     '<button id="qrCount1" class="tap" style="flex:1;padding:10px;border-radius:12px;border:2px solid;' + sel1 + ';cursor:pointer;font-weight:500">1份</button>',
@@ -1549,7 +1552,7 @@ function QuickRecordConfirmModal(food, isCustom) {
     '<input id="qrCustomNum" type="number" min="1" max="20" value="' + count + '" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box" placeholder="份数" />',
     '</div>',
     '<div style="background:#f8fafc;border-radius:10px;padding:10px;text-align:center">',
-    '<div class="text-sm font-semibold">合计：' + formatKcal(cal) + ' kcal · 蛋白质 ' + formatGram(pro) + 'g</div></div>',
+    '<div class="text-sm font-semibold">合计：' + (cal > 0 ? formatKcal(cal) + ' kcal' : '-- kcal') + ' · 蛋白质 ' + (pro > 0 ? formatGram(pro) + 'g' : '-- g') + '</div></div>',
     '</div>',
     '<div style="display:flex;border-top:1px solid rgba(15,23,42,0.06)">',
     '<button id="qrCancel" class="tap" style="flex:1;padding:16px;border:none;background:transparent;color:#999;font-size:15px;cursor:pointer;-webkit-tap-highlight-color:transparent">取消</button>',
@@ -1567,12 +1570,13 @@ function QuickRecordCustomForm() {
     '<div style="display:flex;flex-direction:column;gap:12px">',
     '<div><div class="text-xs text-slate-500 mb-1">食物名称</div>',
     '<input id="qfName" type="text" placeholder="如：拿铁咖啡" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
-    '<div><div class="text-xs text-slate-500 mb-1">热量（kcal）<span style="color:var(--rose)">*</span></div>',
-    '<input id="qfCal" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="例如：150" min="1" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
+    '<div><div class="text-xs text-slate-500 mb-1">热量（kcal）<span style="color:#999">（选填）</span></div>',
+    '<input id="qfCal" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="例如：150（选填）" min="1" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
     '<div><div class="text-xs text-slate-500 mb-1">蛋白质（g）<span style="color:#999">（选填）</span></div>',
-    '<input id="qfProtein" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="例如：8" min="0" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
-    '<div><div class="text-xs text-slate-500 mb-1">规格备注（如：1杯）</div>',
-    '<input id="qfAmount" type="text" placeholder="如：1杯 / 1碗 / 1个 / 250ml" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
+    '<input id="qfProtein" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="例如：8（选填）" min="0" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
+    '<div><div class="text-xs text-slate-500 mb-1">重量</div>',
+    '<input id="qfAmount" type="text" placeholder="重量：如 200g / 250ml / 1个（约150g）" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
+    '<div class="text-xs text-slate-400 mt-1" style="padding-top:2px">不知道热量？先填名称和重量即可保存</div>',
     '</div></div>',
     '<div style="display:flex;border-top:1px solid rgba(15,23,42,0.06)">',
     '<button id="qfCancel" class="tap" style="flex:1;padding:16px;border:none;background:transparent;color:#999;font-size:15px;cursor:pointer;-webkit-tap-highlight-color:transparent">取消</button>',
@@ -2494,11 +2498,15 @@ function bindQuickRecordCustomForm() {
   var saveBtn = $app.querySelector("#qfSave");
   if (saveBtn) saveBtn.addEventListener("click", async function() {
     var name = ($app.querySelector("#qfName")?.value || "").trim();
-    var cal = Number($app.querySelector("#qfCal")?.value || 0);
-    var protein = Number($app.querySelector("#qfProtein")?.value || 0);
+    var calRaw = ($app.querySelector("#qfCal")?.value || "").trim();
+    var proRaw = ($app.querySelector("#qfProtein")?.value || "").trim();
     var amount = ($app.querySelector("#qfAmount")?.value || "").trim();
     if (!name) { setToast("请输入食物名称"); return; }
-    if (!cal || cal <= 0) { setToast("请输入有效的热量值"); return; }
+    // 热量、蛋白质均为选填：没填则按 0 处理，仍允许保存
+    var cal = calRaw ? Number(calRaw) : 0;
+    var protein = proRaw ? Number(proRaw) : 0;
+    if (isNaN(cal)) cal = 0;
+    if (isNaN(protein)) protein = 0;
 
     var customFoods = lsGet(LS_KEYS.customFoods, []);
     customFoods.push({ name: name, calories: cal, protein: protein, amount: amount || "1份", category: state.qrCategory || "其他", createdAt: new Date().toISOString() });

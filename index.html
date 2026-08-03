@@ -135,7 +135,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260803132520";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804060440";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -602,6 +602,82 @@ const FOOD_PRESETS = {
   ],
 };
 const FOOD_CATEGORIES = ["饮品", "水果", "零食", "主食", "蛋奶"];
+
+// ===== 食物密度库（用于 AI 估算）=====
+// 每条：keywords 匹配关键词数组, calPerG 热量kcal/g, proteinPer100 蛋白质g/100g
+const FOOD_DENSITY = [
+  { keywords: ["米饭", "白饭", "炒饭"], calPerG: 1.15, proteinPer100: 2.6 },
+  { keywords: ["面条", "面"], calPerG: 1.38, proteinPer100: 4.5 },
+  { keywords: ["馒头"], calPerG: 2.23, proteinPer100: 7.0 },
+  { keywords: ["粥", "稀饭"], calPerG: 0.46, proteinPer100: 1.1 },
+  { keywords: ["饺子", "水饺", "馄饨", "抄手"], calPerG: 2.0, proteinPer100: 8.0 },
+  { keywords: ["牛奶", "纯奶"], calPerG: 0.6, proteinPer100: 3.0 },
+  { keywords: ["豆浆"], calPerG: 0.48, proteinPer100: 2.4 },
+  { keywords: ["鸡蛋", "蛋"], calPerG: 1.43, proteinPer100: 12.7 },
+  { keywords: ["酸奶", "优酪乳"], calPerG: 0.72, proteinPer100: 3.2 },
+  { keywords: ["苹果"], calPerG: 0.52, proteinPer100: 0.3 },
+  { keywords: ["香蕉"], calPerG: 0.89, proteinPer100: 1.1 },
+  { keywords: ["橙子", "橙", "橘子", "桔子"], calPerG: 0.47, proteinPer100: 0.9 },
+  { keywords: ["鸡胸", "鸡胸肉", "鸡腿", "鸡肉"], calPerG: 1.65, proteinPer100: 31.0 },
+  { keywords: ["牛肉", "牛腩", "牛排"], calPerG: 2.5, proteinPer100: 26.0 },
+  { keywords: ["猪肉", "五花肉", "排骨", "瘦肉"], calPerG: 2.43, proteinPer100: 20.0 },
+  { keywords: ["鱼肉", "鱼", "三文鱼", "鲈鱼", "带鱼"], calPerG: 1.23, proteinPer100: 18.0 },
+  { keywords: ["西兰花", "花椰菜"], calPerG: 0.34, proteinPer100: 2.8 },
+  { keywords: ["西红柿", "番茄"], calPerG: 0.18, proteinPer100: 0 },
+  { keywords: ["土豆", "马铃薯", "洋芋"], calPerG: 0.77, proteinPer100: 2.0 },
+  { keywords: ["豆腐"], calPerG: 0.85, proteinPer100: 8.0 },
+];
+
+// 解析重量字符串 → 克数（支持 g/kg/ml/个/只/杯/碗/片/根/把）
+function parseWeightToGrams(amountStr) {
+  if (!amountStr) return 0;
+  var s = String(amountStr).trim();
+  var numMatch = s.match(/(\d+(?:\.\d+)?)/);
+  if (!numMatch) return 0;
+  var num = parseFloat(numMatch[1]);
+  if (s.includes("kg")) return Math.round(num * 1000);
+  if (s.includes("ml") || s.includes("毫升")) return Math.round(num); // 液体≈水密度 1g/ml
+  if (s.includes("个") || s.includes("只") || s.includes("枚")) {
+    // 按常见单重估算：鸡蛋60g / 苹果200g / 香蕉120g / 橙子150g / 馒头100g
+    var singles = { "蛋": 60, "苹果": 200, "香蕉": 120, "橙": 150, "橘子": 150, "馒头": 100, "土豆": 200, "番茄": 150, "西红柿": 150, "饺子": 20, "鸡": 200 };
+    var hit = 0;
+    for (var k in singles) { if (s.includes(k)) { hit = singles[k]; break; } }
+    return Math.round(num * (hit || 100));
+  }
+  if (s.includes("杯")) return Math.round(num * 200); // 1杯≈200ml
+  if (s.includes("碗")) return Math.round(num * 200); // 1碗≈200g
+  if (s.includes("片")) return Math.round(num * 30);  // 1片≈30g
+  if (s.includes("根")) return Math.round(num * 120); // 1根≈120g
+  if (s.includes("把")) return Math.round(num * 80);  // 1把≈80g
+  if (s.includes("g") || s.includes("克")) return Math.round(num);
+  return Math.round(num); // 默认视为克
+}
+
+// AI 估算：根据名称关键词 + 重量 → {calories, protein}，无匹配返回 null
+function estimateFoodAI(name, amountStr) {
+  if (!name) return null;
+  var n = String(name).trim();
+  // 最长关键词优先匹配
+  var best = null;
+  for (var i = 0; i < FOOD_DENSITY.length; i++) {
+    var item = FOOD_DENSITY[i];
+    for (var j = 0; j < item.keywords.length; j++) {
+      var kw = item.keywords[j];
+      if (kw.length > 1 && n.indexOf(kw) >= 0) {
+        if (!best || kw.length > best.kwLen) {
+          best = { item: item, kwLen: kw.length };
+        }
+      }
+    }
+  }
+  if (!best) return null;
+  var grams = parseWeightToGrams(amountStr);
+  if (grams <= 0) return null; // 没重量无法估算
+  var calories = Math.round(grams * best.item.calPerG);
+  var protein = Math.round((grams * best.item.proteinPer100) / 100);
+  return { calories: calories, protein: protein, matched: best.item.keywords[0], grams: grams };
+}
+
 
 
 
@@ -1569,14 +1645,19 @@ function QuickRecordCustomForm() {
     '<div class="font-semibold mb-4">✏️ 手写输入</div>',
     '<div style="display:flex;flex-direction:column;gap:12px">',
     '<div><div class="text-xs text-slate-500 mb-1">食物名称</div>',
-    '<input id="qfName" type="text" placeholder="如：拿铁咖啡" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
-    '<div><div class="text-xs text-slate-500 mb-1">热量（kcal）<span style="color:#999">（选填）</span></div>',
-    '<input id="qfCal" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="例如：150（选填）" min="1" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
-    '<div><div class="text-xs text-slate-500 mb-1">蛋白质（g）<span style="color:#999">（选填）</span></div>',
-    '<input id="qfProtein" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="例如：8（选填）" min="0" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
+    '<input id="qfName" type="text" placeholder="如：鸡蛋 / 米饭 / 苹果" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
     '<div><div class="text-xs text-slate-500 mb-1">重量</div>',
     '<input id="qfAmount" type="text" placeholder="重量：如 200g / 250ml / 1个（约150g）" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
-    '<div class="text-xs text-slate-400 mt-1" style="padding-top:2px">不知道热量？先填名称和重量即可保存</div>',
+    '<div id="qfAIEstimate" style="display:none;background:#F0FDF4;border:1px solid rgba(74,124,89,0.25);border-radius:10px;padding:10px 12px">',
+    '<div class="text-xs font-semibold" style="color:var(--brand)">🤖 AI 估算</div>',
+    '<div id="qfAIText" class="text-sm mt-1" style="color:#334155"></div>',
+    '<button id="qfAIFill" class="tap" style="display:none;margin-top:8px;width:100%;padding:8px;border:none;background:var(--brand);color:#fff;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer">使用估算结果</button>',
+    '</div>',
+    '<div><div class="text-xs text-slate-500 mb-1">热量（kcal）<span style="color:#999">（选填，可让 AI 自动估算）</span></div>',
+    '<input id="qfCal" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="例如：150" min="1" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
+    '<div><div class="text-xs text-slate-500 mb-1">蛋白质（g）<span style="color:#999">（选填，可让 AI 自动估算）</span></div>',
+    '<input id="qfProtein" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="例如：8" min="0" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
+    '<div class="text-xs text-slate-400 mt-1" style="padding-top:2px">输入名称和重量后，AI 会自动估算热量与蛋白质 ✨</div>',
     '</div></div>',
     '<div style="display:flex;border-top:1px solid rgba(15,23,42,0.06)">',
     '<button id="qfCancel" class="tap" style="flex:1;padding:16px;border:none;background:transparent;color:#999;font-size:15px;cursor:pointer;-webkit-tap-highlight-color:transparent">取消</button>',
@@ -2493,6 +2574,51 @@ function bindQuickRecordCustomForm() {
   if (cancelBtn) cancelBtn.addEventListener("click", function() {
     var modalDiv = $app.querySelector("#qrModal");
     if (modalDiv) modalDiv.style.display = "none";
+  });
+
+  // ===== AI 自动估算：监听名称 + 重量输入 =====
+  var aiEstimateBox = $app.querySelector("#qfAIEstimate");
+  var aiText = $app.querySelector("#qfAIText");
+  var aiFill = $app.querySelector("#qfAIFill");
+  var aiLast = null;
+
+  function updateAIEstimate() {
+    var name = ($app.querySelector("#qfName")?.value || "").trim();
+    var amount = ($app.querySelector("#qfAmount")?.value || "").trim();
+    if (!aiEstimateBox || !aiText || !aiFill) return;
+    if (!name) {
+      aiEstimateBox.style.display = "none";
+      aiFill.style.display = "none";
+      aiLast = null;
+      return;
+    }
+    var est = estimateFoodAI(name, amount);
+    if (!est) {
+      aiEstimateBox.style.display = "none";
+      aiFill.style.display = "none";
+      aiLast = null;
+      return;
+    }
+    aiEstimateBox.style.display = "block";
+    aiText.textContent = "识别为「" + est.matched + "」约 " + est.grams + "g → 热量约 " + est.calories + " kcal · 蛋白质约 " + est.protein + "g";
+    aiFill.style.display = "block";
+    aiLast = est;
+  }
+
+  var nameInput = $app.querySelector("#qfName");
+  var amountInput = $app.querySelector("#qfAmount");
+  if (nameInput) nameInput.addEventListener("input", updateAIEstimate);
+  if (nameInput) nameInput.addEventListener("change", updateAIEstimate);
+  if (amountInput) amountInput.addEventListener("input", updateAIEstimate);
+  if (amountInput) amountInput.addEventListener("change", updateAIEstimate);
+
+  if (aiFill) aiFill.addEventListener("click", function() {
+    if (!aiLast) return;
+    var calInput = $app.querySelector("#qfCal");
+    var proInput = $app.querySelector("#qfProtein");
+    if (calInput) calInput.value = aiLast.calories;
+    if (proInput) proInput.value = aiLast.protein;
+    setToast("已填入 AI 估算结果，可手动微调");
   });
 
   var saveBtn = $app.querySelector("#qfSave");

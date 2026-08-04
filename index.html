@@ -140,23 +140,22 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804093835";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804113330";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
-// TODO: 接入 Supabase Auth 后，用真实用户 id 替换本地匿名 id。
+// 安全说明：
+// - 本文件禁止存放任何 API Key（明文或编码都不行，GitHub secret scanning 会拦截，且公开页面可被提取）。
+// - AI 识别由 backend/ 后端转发，Key 只存在于后端 .env 环境变量中。
 window.EATGUARD_CONFIG = {
   supabaseUrl: "",
   supabaseAnonKey: "",
-  // ===== AI 识别双引擎配置（纯前端 Demo 可填；生产环境请改由后端转发，避免 Key 泄露）=====
-  // 文字描述识别 → DeepSeek（https://platform.deepseek.com/）
-  // 说明：为避免 GitHub 仓库 secret scanning 拦截，此处以 base64 编码存储，运行时 atob 解码。
-  // 注意：页面源码仍可提取该 Key；正式上线请务必改由后端转发，避免泄露。
-  deepseekApiKey: atob("c2stMTQxMjI2NDQ4Y2M3NDAyYzkyYzQxODU3ZWFjMmVhNTk="),
-  // 拍照识别 → 通义千问 Qwen-VL / DashScope（https://dashscope.aliyun.com/）
-  dashscopeApiKey: "sk-ws-H.ELEELMX.98KQ.MEUCIQCXksFU3etZspnJc_pBE1K8BgZ-tDS9l6v78dA_FALg9AIgXZZ-NuYuuvjdQhKigwycgCFauCuymxR5DhboCXl0UdU",
+  // AI 后端服务地址（转发 DeepSeek / 通义千问 请求，Key 在后端）
+  // - 本地开发：http://localhost:3000
+  // - 生产环境：填 Vercel 部署域名，如 https://eatguard-ai.vercel.app
+  // - 留空时前端默认使用 http://localhost:3000（也可在设置页内修改，存本机）
+  aiBackendUrl: "",
 };
-
 </script><script>// ============================================================
 // EatGuard 内置食物营养数据库（每 100g 可食部）
 // 数据参考：《中国食物成分表（标准版）》、USDA 常见食物数据
@@ -954,88 +953,48 @@ function estimateFoodAI(name, amountStr) {
   return { calories: calories, protein: protein, matched: best.item.keywords[0], grams: grams, fromDb: false };
 }
 
-// ===== AI 双引擎智能估算（文字→DeepSeek / 图片→通义千问 Qwen-VL）=====
+// ===== AI 智能估算（后端转发：文字→DeepSeek / 图片→通义千问 Qwen-VL）=====
+// 安全：前端不含任何 API Key，全部由 backend/ 服务转发
 
-// DeepSeek Key（文字识别）
-function getDeepSeekKey() {
-  var k = (window.EATGUARD_CONFIG && window.EATGUARD_CONFIG.deepseekApiKey) || "";
-  if (!k) k = lsGet("eatguard_deepseek_key", "");
-  return k;
-}
-function setDeepSeekKey(k) { lsSet("eatguard_deepseek_key", k); }
-
-// DashScope Key（拍照识别）
-function getDashScopeKey() {
-  var k = (window.EATGUARD_CONFIG && window.EATGUARD_CONFIG.dashscopeApiKey) || "";
-  if (!k) k = lsGet("eatguard_dashscope_key", "");
-  return k;
-}
-function setDashScopeKey(k) { lsSet("eatguard_dashscope_key", k); }
-
-var AI_FOOD_PROMPT = [
-  "你是一名专业的中国食物营养估算师。请根据输入（图片或文字描述）估算这餐/这份食物的营养成分。",
-  "只输出一个 JSON 对象，不要输出任何其他文字。格式如下：",
-  '{"name":"食物名称（中文，简洁）","amount":"份量描述（如 1碗 / 200g / 1个）","weight_g":200,"calories_kcal":230,"protein_g":6,"fat_g":1,"carbs_g":48,"confidence":0.85,"notes":"估算依据，一两句话，中文（如：一碗米饭约200g，按常见主食密度估算）"}',
-  "规则：1) 数值必须为数字，单位分别是 g、kcal、g；2) 无法确定时按中国常见食物数据估算，并把 confidence 降低到 0.5 以下；3) amount 用中文描述份量；4) notes 必须简洁说明估算依据。"
-].join("\n");
-
-// 稳健解析 AI 返回的 JSON
-function parseAIJSON(content) {
-  if (!content) throw { code: "EMPTY" };
-  var c = String(content).trim();
-  try { return JSON.parse(c); } catch (e) {}
-  var m = c.match(/\{[\s\S]*\}/);
-  if (m) { try { return JSON.parse(m[0]); } catch (e2) {} }
-  throw { code: "BAD_JSON" };
+// 后端地址：config.aiBackendUrl > localStorage > 默认 localhost:3000
+function getBackendUrl() {
+  var cfg = (window.EATGUARD_CONFIG && window.EATGUARD_CONFIG.aiBackendUrl) || "";
+  if (cfg) return cfg.replace(/\/+$/, "");
+  var saved = lsGet("eatguard_backend_url", "");
+  if (saved) return saved.replace(/\/+$/, "");
+  return "http://localhost:3000";
 }
 
-// 通用 OpenAI 兼容请求封装
-async function callOpenAICompat(endpoint, apiKey, body) {
-  var res = await fetch(endpoint, {
+// 调用后端：POST {endpoint}，body 为 {text} 或 {image}
+async function callAIProxy(endpoint, body) {
+  var base = getBackendUrl();
+  var res = await fetch(base + endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  var data = null;
+  try { data = await res.json(); } catch (e) {}
   if (!res.ok) {
-    if (res.status === 401) throw { code: "UNAUTHORIZED" };
-    throw { code: "HTTP_" + res.status };
+    var msg = (data && (data.error || data.message)) || "";
+    var code = res.status === 401 ? "UNAUTHORIZED" : (res.status === 502 || res.status === 503 ? "UPSTREAM" : "HTTP_" + res.status);
+    var err = new Error(msg || ("后端请求失败 " + res.status));
+    err.code = code;
+    err.serverMsg = msg;
+    throw err;
   }
-  var data = await res.json();
-  var content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-  if (!content) throw { code: "EMPTY" };
-  return parseAIJSON(content);
+  if (!data || !data.result) throw { code: "BAD_JSON", serverMsg: (data && data.error) || "" };
+  return data.result;
 }
 
-// 文字描述 → DeepSeek（https://api.deepseek.com/v1/chat/completions, deepseek-chat）
+// 文字描述 → 后端 /api/ai-text → DeepSeek
 async function callDeepSeekAI(text) {
-  var key = getDeepSeekKey();
-  if (!key) throw { code: "NO_KEY" };
-  var userContent = (text ? "用户描述：" + text + "\n\n" : "") + AI_FOOD_PROMPT;
-  return callOpenAICompat("https://api.deepseek.com/v1/chat/completions", key, {
-    model: "deepseek-chat",
-    messages: [{ role: "user", content: userContent }],
-    temperature: 0.2,
-    response_format: { type: "json_object" },
-  });
+  return callAIProxy("/api/ai-text", { text: text || "" });
 }
 
-// 拍照识别 → 通义千问 Qwen-VL（DashScope 兼容模式）
-// content 必须是数组：先 text 后 image_url（注意：DashScope 与 Kimi 顺序/格式不同）
+// 拍照识别 → 后端 /api/ai-image → 通义千问 Qwen-VL
 async function callQwenVLAI(imageBase64) {
-  var key = getDashScopeKey();
-  if (!key) throw { code: "NO_KEY" };
-  return callOpenAICompat("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", key, {
-    model: "qwen-vl-plus",
-    messages: [{
-      role: "user",
-      content: [
-        { type: "text", text: AI_FOOD_PROMPT },
-        { type: "image_url", image_url: { url: imageBase64 } },
-      ],
-    }],
-    temperature: 0.2,
-    response_format: { type: "json_object" },
-  });
+  return callAIProxy("/api/ai-image", { image: imageBase64 });
 }
 
 // 统一入口：文字走 DeepSeek，图片走 Qwen-VL
@@ -1596,27 +1555,21 @@ function bindClicks() {
   });
 }
 
-// 设置页：AI 双引擎 Key 保存
+// 设置页：AI 后端地址保存
 function bindSettingsAIKeys() {
-  var btnDS = $app.querySelector("#aiKeySaveDS");
-  var inputDS = $app.querySelector("#aiKeyDeepSeek");
-  if (btnDS && inputDS) {
-    btnDS.addEventListener("click", function() {
-      var v = (inputDS.value || "").trim();
-      if (v) setDeepSeekKey(v);
-      else { lsSet("eatguard_deepseek_key", ""); }
-      setToast(v ? "DeepSeek Key 已保存" : "已清除 DeepSeek Key");
-      render();
-    });
-  }
-  var btnDash = $app.querySelector("#aiKeySaveDash");
-  var inputDash = $app.querySelector("#aiKeyDash");
-  if (btnDash && inputDash) {
-    btnDash.addEventListener("click", function() {
-      var v = (inputDash.value || "").trim();
-      if (v) setDashScopeKey(v);
-      else { lsSet("eatguard_dashscope_key", ""); }
-      setToast(v ? "通义千问 Key 已保存" : "已清除通义千问 Key");
+  var btn = $app.querySelector("#aiBackendSave");
+  var input = $app.querySelector("#aiBackendInput");
+  if (btn && input) {
+    btn.addEventListener("click", function() {
+      var v = (input.value || "").trim().replace(/\/+$/, "");
+      if (v) {
+        if (!/^https?:\/\//.test(v)) { setToast("地址需以 http(s):// 开头"); return; }
+        lsSet("eatguard_backend_url", v);
+        setToast("后端地址已保存");
+      } else {
+        lsSet("eatguard_backend_url", "");
+        setToast("已恢复默认 localhost:3000");
+      }
       render();
     });
   }
@@ -2497,44 +2450,31 @@ function SettingsPage() {
     `,
   });
 
-  // ===== AI 识别双引擎配置 =====
-  const dsKey = getDeepSeekKey();
-  const dsKeyDisplay = dsKey ? "已配置 ✓" : "未配置";
-  const dashKey = getDashScopeKey();
-  const dashKeyDisplay = dashKey ? "已配置 ✓" : "未配置";
+  // ===== AI 识别（后端转发）配置 =====
+  const backendUrl = getBackendUrl();
 
   const aiCard = Card({
     className: "mt-4",
     inner: `
       <div class="font-semibold">AI 识别</div>
-      <div class="text-xs text-slate-500 mt-1">双引擎：文字描述用 DeepSeek，拍照识别用通义千问</div>
+      <div class="text-xs text-slate-500 mt-1">后端转发：文字→DeepSeek，拍照→通义千问。API Key 仅存在于后端环境变量，前端不保存任何 Key。</div>
 
       <div class="mt-3">
         <div class="flex items-center justify-between mb-1">
-          <span class="text-xs text-slate-600">DeepSeek API Key <span class="text-slate-400">（用于文字描述识别）</span></span>
-          <span class="text-xs ${dsKey ? 'text-emerald-600' : 'text-amber-600'}">${dsKeyDisplay}</span>
+          <span class="text-xs text-slate-600">后端服务地址</span>
+          <span class="text-xs ${backendUrl ? 'text-emerald-600' : 'text-amber-600'}">${backendUrl ? '已配置' : '默认 localhost:3000'}</span>
         </div>
         <div style="display:flex;gap:8px">
-          <input id="aiKeyDeepSeek" type="password" placeholder="sk-..." value="${escapeHtml(dsKey)}" style="flex:1;min-width:0;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:14px;box-sizing:border-box;background:#fff" />
-          <button id="aiKeySaveDS" class="tap" style="padding:0 16px;border:none;border-radius:10px;background:var(--brand);color:#fff;font-size:13px;font-weight:500;cursor:pointer">保存</button>
+          <input id="aiBackendInput" type="url" placeholder="http://localhost:3000 或 https://xxx.vercel.app" value="${escapeHtml(backendUrl)}" style="flex:1;min-width:0;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:14px;box-sizing:border-box;background:#fff" />
+          <button id="aiBackendSave" class="tap" style="padding:0 16px;border:none;border-radius:10px;background:var(--brand);color:#fff;font-size:13px;font-weight:500;cursor:pointer">保存</button>
         </div>
-        <a href="https://platform.deepseek.com/" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;font-size:12px;color:var(--brand);text-decoration:underline">获取 DeepSeek API Key →</a>
-      </div>
-
-      <div class="mt-4">
-        <div class="flex items-center justify-between mb-1">
-          <span class="text-xs text-slate-600">通义千问 DashScope API Key <span class="text-slate-400">（用于拍照识别）</span></span>
-          <span class="text-xs ${dashKey ? 'text-emerald-600' : 'text-amber-600'}">${dashKeyDisplay}</span>
+        <div class="text-xs text-slate-400 mt-2 leading-relaxed">
+          本地开发启动 backend/ 后填 http://localhost:3000；Vercel 部署后填 https://你的项目.vercel.app
         </div>
-        <div style="display:flex;gap:8px">
-          <input id="aiKeyDash" type="password" placeholder="sk-..." value="${escapeHtml(dashKey)}" style="flex:1;min-width:0;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:14px;box-sizing:border-box;background:#fff" />
-          <button id="aiKeySaveDash" class="tap" style="padding:0 16px;border:none;border-radius:10px;background:var(--brand);color:#fff;font-size:13px;font-weight:500;cursor:pointer">保存</button>
-        </div>
-        <a href="https://dashscope.aliyun.com/" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;font-size:12px;color:var(--brand);text-decoration:underline">获取通义千问 API Key →</a>
       </div>
 
       <div class="text-xs text-slate-400 mt-3 leading-relaxed">
-        纯前端 Demo 场景下 Key 仅保存在本机浏览器（localStorage）；正式上线请改由后端转发，避免 Key 泄露。
+        安全说明：前端代码中不包含任何 API Key。Key 请配置在 backend/.env（本地）或 Vercel Environment Variables（线上）。
       </div>
     `,
   });
@@ -3175,9 +3115,11 @@ function bindQuickRecordCustomForm() {
 
   function aiErrorToast(err) {
     var code = err && err.code ? err.code : "";
-    if (code === "NO_KEY") setToast("请先配置对应 API Key（见设置页）");
-    else if (code === "UNAUTHORIZED") setToast("API Key 无效，请检查后重试");
+    var msg = err && err.serverMsg ? err.serverMsg : "";
+    if (code === "UNAUTHORIZED") setToast("后端 Key 无效，请在服务端检查 .env 配置");
     else if (code === "BAD_JSON") { setToast("AI 识别出错，已为您切换到手动输入"); }
+    else if (code === "UPSTREAM") setToast(msg || "AI 服务暂时不可用，请稍后重试");
+    else if (code && code.indexOf("HTTP_") === 0) setToast(msg || "后端服务异常，请检查后端是否已启动");
     else setToast("网络不稳定，请检查连接后重试");
   }
 
@@ -3235,14 +3177,9 @@ function bindQuickRecordCustomForm() {
     });
   }
 
-  // 拍照识别（→ 通义千问 Qwen-VL）
+  // 拍照识别（→ 后端 /api/ai-image → 通义千问 Qwen-VL）
   if (aiPhotoBtn && aiPhotoInput) {
     aiPhotoBtn.addEventListener("click", function() {
-      // 前置校验：拍照需要 DashScope Key
-      if (!getDashScopeKey()) {
-        setToast("请先配置通义千问 API Key（见设置页）");
-        return;
-      }
       aiPhotoInput.value = "";
       aiPhotoInput.click();
     });
@@ -3268,14 +3205,9 @@ function bindQuickRecordCustomForm() {
     });
   }
 
-  // 文字识别（→ DeepSeek）
+  // 文字识别（→ 后端 /api/ai-text → DeepSeek）
   if (aiTextBtn) {
     aiTextBtn.addEventListener("click", function() {
-      // 前置校验：文字需要 DeepSeek Key
-      if (!getDeepSeekKey()) {
-        setToast("请先配置 DeepSeek API Key（见设置页）");
-        return;
-      }
       if (qrModalDiv) {
         qrModalDiv.innerHTML = AITextInputModal();
         qrModalDiv.style.display = "block";
@@ -3304,7 +3236,7 @@ function bindQuickRecordCustomForm() {
     });
   }
 
-  // 执行 AI 请求：图片→Qwen-VL，文字→DeepSeek
+  // 执行 AI 请求：图片→后端 /api/ai-image，文字→后端 /api/ai-text
   async function runAIAnalysis(opts) {
     try {
       var result = await callAIAnalyze(opts);
@@ -3313,11 +3245,7 @@ function bindQuickRecordCustomForm() {
     } catch (err) {
       console.error("AI analysis failed:", err);
       showAILoading(false);
-      if (err && err.code === "NO_KEY") {
-        setToast(opts.imageBase64 ? "请先配置通义千问 API Key（见设置页）" : "请先配置 DeepSeek API Key（见设置页）");
-      } else {
-        aiErrorToast(err);
-      }
+      aiErrorToast(err);
     }
   }
 

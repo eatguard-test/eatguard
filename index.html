@@ -155,7 +155,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804211151";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804221131";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -3607,7 +3607,21 @@ window.addEventListener("hashchange", renderDebounced);
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return;
   try {
-    await navigator.serviceWorker.register("./sw.js", { scope: "./" });
+    await navigator.serviceWorker.register("./sw.js", { scope: "./", updateViaCache: "none" });
+    // 新 SW 接管（版本更新）时自动刷新，保证拿到最新代码
+    navigator.serviceWorker.addEventListener("controllerchange", function() {
+      console.log("[EatGuard] Service Worker 已更新，自动刷新");
+      setToast("已更新到最新版本...");
+      setTimeout(function() { location.reload(); }, 600);
+    });
+    // 新 SW activate 后主动通知页面刷新
+    navigator.serviceWorker.addEventListener("message", function(e) {
+      if (e.data && e.data.type === "EATGUARD_SW_UPDATED") {
+        console.log("[EatGuard] 收到 SW 更新通知，自动刷新");
+        setToast("已更新到最新版本...");
+        setTimeout(function() { location.reload(); }, 600);
+      }
+    });
   } catch (e) {
     console.warn("SW register failed", e);
   }

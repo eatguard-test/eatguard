@@ -155,7 +155,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804203253";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804211151";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -1033,15 +1033,20 @@ async function callAIAnalyze(opts) {
 }
 
 // 图片压缩：宽度不超过 maxWidth（默认 1024px），JPEG 0.8，返回 DataURL(base64)
-// 用 FileReader 方式，兼容 Safari/HEIC；全程 try-catch 保证回调必定触发（失败回调 null）
+// 用 FileReader 方式，兼容 Safari/HEIC；全程 try-catch + 超时保护，保证回调必定触发（失败回调 null）
 function compressImage(file, callback, maxWidth) {
   var MAX_W = maxWidth || 1024;
   var done = false;
   function finish(dataUrl) {
     if (done) return;
     done = true;
+    if (timer) clearTimeout(timer);
     callback(dataUrl);
   }
+  var timer = setTimeout(function() {
+    console.error("[EatGuard] 图片压缩超时（10s），回调 null");
+    finish(null);
+  }, 10000);
   try {
     var reader = new FileReader();
     reader.onload = function(e) {
@@ -3186,32 +3191,28 @@ function bindQuickRecordCustomForm() {
       if (state.aiLastMode === "photo" && aiPhotoBtn) aiPhotoBtn.click();
       else if (state.aiLastMode === "text" && aiTextBtn) aiTextBtn.click();
     });
-    // 确认保存：将结果填入手动表单
+    // 确认保存：直接保存为一条记录（写入 localStorage + 刷新列表）
     var applyBtn = $app.querySelector("#aiApply");
-    if (applyBtn) applyBtn.addEventListener("click", function() {
+    if (applyBtn) applyBtn.addEventListener("click", async function() {
       function v(id) { var el = $app.querySelector(id); return el ? el.value.trim() : ""; }
+      function num(id) { var n = parseFloat(v(id)); return isNaN(n) ? 0 : n; }
       var name = v("#aiName") || "未命名食物";
       var amount = v("#aiAmount");
       var weight = parseFloat(v("#aiWeight"));
-      var cal = parseFloat(v("#aiCal"));
-      var protein = parseFloat(v("#aiProtein"));
-      var fat = parseFloat(v("#aiFat"));
-      var carbs = parseFloat(v("#aiCarbs"));
-      var qfName = $app.querySelector("#qfName");
-      var qfAmount = $app.querySelector("#qfAmount");
-      var qfCal = $app.querySelector("#qfCal");
-      var qfProtein = $app.querySelector("#qfProtein");
-      var qfFat = $app.querySelector("#qfFat");
-      var qfCarbs = $app.querySelector("#qfCarbs");
-      if (qfName) qfName.value = name;
-      if (qfAmount) qfAmount.value = amount || (weight ? weight + "g" : "");
-      if (qfCal && !isNaN(cal)) qfCal.value = cal;
-      if (qfProtein && !isNaN(protein)) qfProtein.value = protein;
-      if (qfFat && !isNaN(fat)) qfFat.value = fat;
-      if (qfCarbs && !isNaN(carbs)) qfCarbs.value = carbs;
-      state.aiEstimateUsed = true; // 保存时标记 source=ai_estimate
+      var cal = num("#aiCal");
+      var protein = num("#aiProtein");
+      var fat = num("#aiFat");
+      var carbs = num("#aiCarbs");
+      if (!amount && weight) amount = weight + "g";
       closeModal("#qrAIResultOverlay");
-      setToast("已填入 AI 结果，可微调后保存");
+      setToast("正在保存...");
+      var ok = await saveQuickRecordMeal({
+        name: name, amount: amount, cal: cal, protein: protein, fat: fat, carbs: carbs, source: "ai_estimate"
+      });
+      if (ok) {
+        console.log("✅ AI 结果已保存为记录:", name);
+        setToast("已保存：" + name);
+      }
     });
   }
 
@@ -3299,6 +3300,34 @@ function bindQuickRecordCustomForm() {
     }
   }
 
+  // 保存一条快速记录（手写表单/AI 结果共用）
+  // data: {name, amount, cal, protein, fat, carbs, source}
+  // 成功返回 true，失败返回 false（已 toast 提示）
+  async function saveQuickRecordMeal(data) {
+    try {
+      console.log("💾 保存记录:", data.name, data.cal, "kcal, source=", data.source);
+      var customFoods = lsGet(LS_KEYS.customFoods, []);
+      customFoods.push({ name: data.name, calories: data.cal, protein: data.protein, fat: data.fat, carbs: data.carbs, amount: data.amount || "1份", category: state.qrCategory || "其他", createdAt: new Date().toISOString() });
+      lsSet(LS_KEYS.customFoods, customFoods);
+
+      var items = [{ name: data.name, amount: data.amount || "1份", calories: data.cal, protein: data.protein, fat: data.fat, carbs: data.carbs }];
+      var meal = { id: uid(), user_id: state.userId, photo_url: "", food_items: items, eaten_percentage: 100, meal_total_calories: data.cal, meal_total_protein: data.protein, source: data.source || "quickrecord", created_at: new Date().toISOString() };
+      await dbInsertMeal(meal);
+      var dateStr = todayStr();
+      var row = await ensureTodayRows(state.userId, state.profile, dateStr);
+      await dbUpsertDailyTarget({ user_id: row.user_id, date: row.date, actual_calories: (row.actual_calories ?? 0) + data.cal, is_baseline_day: isBaseline(state.profile, dateStr), target_calories: row.target_calories });
+      state.profile = await maybeCompleteBaseline(state.userId, state.profile, dateStr);
+      await ensureTodayTarget(state.userId, state.profile, dateStr);
+      await reloadData();
+      render(); // 重绘，确保新增记录/自定义食物立即显示
+      return true;
+    } catch (err) {
+      console.error("QuickRecord save failed:", err);
+      setToast("保存失败：" + (err && err.message ? err.message : "请重试"));
+      return false;
+    }
+  }
+
   var saveBtn = $app.querySelector("#qfSave");
   if (saveBtn) saveBtn.addEventListener("click", async function() {
     var name = ($app.querySelector("#qfName")?.value || "").trim();
@@ -3317,28 +3346,10 @@ function bindQuickRecordCustomForm() {
     var isAI = !!state.aiEstimateUsed;
     state.aiEstimateUsed = false; // 用完即重置
 
-    var customFoods = lsGet(LS_KEYS.customFoods, []);
-    customFoods.push({ name: name, calories: cal, protein: protein, fat: fat, carbs: carbs, amount: amount || "1份", category: state.qrCategory || "其他", createdAt: new Date().toISOString() });
-    lsSet(LS_KEYS.customFoods, customFoods);
-
-    var items = [{ name: name, amount: amount || "1份", calories: cal, protein: protein, fat: fat, carbs: carbs }];
-    var meal = { id: uid(), user_id: state.userId, photo_url: "", food_items: items, eaten_percentage: 100, meal_total_calories: cal, meal_total_protein: protein, source: isAI ? "ai_estimate" : "quickrecord", created_at: new Date().toISOString() };
     var modalDiv = $app.querySelector("#qrModal");
     if (modalDiv) modalDiv.style.display = "none";
-    try {
-      await dbInsertMeal(meal);
-      var dateStr = todayStr();
-      var row = await ensureTodayRows(state.userId, state.profile, dateStr);
-      await dbUpsertDailyTarget({ user_id: row.user_id, date: row.date, actual_calories: (row.actual_calories ?? 0) + cal, is_baseline_day: isBaseline(state.profile, dateStr), target_calories: row.target_calories });
-      state.profile = await maybeCompleteBaseline(state.userId, state.profile, dateStr);
-      await ensureTodayTarget(state.userId, state.profile, dateStr);
-      await reloadData();
-      setToast("已记录：" + name);
-      render(); // 直接用 render 重绘，确保新增自定义食物立即显示
-    } catch (err) {
-      console.error("QuickRecord custom save failed:", err);
-      setToast("保存失败，请重试。");
-    }
+    var ok = await saveQuickRecordMeal({ name: name, amount: amount, cal: cal, protein: protein, fat: fat, carbs: carbs, source: isAI ? "ai_estimate" : "quickrecord" });
+    if (ok) setToast("已记录：" + name);
   });
 }
 function bindRecognizeSlider() {

@@ -39,8 +39,9 @@ module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method Not Allowed" });
   }
-  const image = (req.body && req.body.image) || "";
-  if (!image) return res.status(400).json({ error: "image 不能为空" });
+  // 兼容两种字段名：前端统一发送 imageBase64，旧的 image 也接受
+  const image = (req.body && (req.body.imageBase64 || req.body.image)) || "";
+  if (!image) return res.status(400).json({ error: "imageBase64 不能为空" });
 
   const key = process.env.DASHSCOPE_API_KEY || "";
   if (!key) {
@@ -48,24 +49,39 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const upstream = await fetch("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + key },
-      body: JSON.stringify({
-        model: "qwen-vl-plus",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: AI_FOOD_PROMPT },
-              { type: "image_url", image_url: { url: image } },
-            ],
-          },
-        ],
-        temperature: 0.2,
-        response_format: { type: "json_object" },
-      }),
-    });
+    // 60s 超时，避免上游无响应导致前端无限等待
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60000);
+    let upstream;
+    try {
+      upstream = await fetch("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + key },
+        body: JSON.stringify({
+          model: "qwen-vl-plus",
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: AI_FOOD_PROMPT },
+                { type: "image_url", image_url: { url: image } },
+              ],
+            },
+          ],
+          temperature: 0.2,
+          // 注意：qwen-vl-plus 不支持 response_format: json_object，省略该参数
+        }),
+        signal: controller.signal,
+      });
+    } catch (e) {
+      clearTimeout(timer);
+      if (e && e.name === "AbortError") {
+        return res.status(504).json({ error: "通义千问接口超时（60s），请稍后重试" });
+      }
+      return res.status(502).json({ error: "无法连接通义千问服务：" + e.message });
+    }
+    clearTimeout(timer);
+
     const data = await upstream.json();
     if (!upstream.ok) {
       const msg =

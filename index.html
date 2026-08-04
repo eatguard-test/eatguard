@@ -140,7 +140,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804081217";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804091242";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -148,9 +148,11 @@ body {
 window.EATGUARD_CONFIG = {
   supabaseUrl: "",
   supabaseAnonKey: "",
-  // Kimi (Moonshot) AI API Key —— 用于"拍照识别/文字描述"自动估算
-  // 注意：纯前端 Demo 场景可在此填写；生产环境请务必改由后端转发，避免 Key 泄露。
-  moonshotApiKey: "",
+  // ===== AI 识别双引擎配置（纯前端 Demo 可填；生产环境请改由后端转发，避免 Key 泄露）=====
+  // 文字描述识别 → DeepSeek（https://platform.deepseek.com/）
+  deepseekApiKey: "",
+  // 拍照识别 → 通义千问 Qwen-VL / DashScope（https://dashscope.aliyun.com/）
+  dashscopeApiKey: "",
 };
 
 </script><script>// ============================================================
@@ -950,13 +952,23 @@ function estimateFoodAI(name, amountStr) {
   return { calories: calories, protein: protein, matched: best.item.keywords[0], grams: grams, fromDb: false };
 }
 
-// ===== Kimi (Moonshot) AI 智能估算（拍照 / 文字）=====
-function getAIKey() {
-  var k = (window.EATGUARD_CONFIG && window.EATGUARD_CONFIG.moonshotApiKey) || "";
-  if (!k) k = lsGet("eatguard_moonshot_key", "");
+// ===== AI 双引擎智能估算（文字→DeepSeek / 图片→通义千问 Qwen-VL）=====
+
+// DeepSeek Key（文字识别）
+function getDeepSeekKey() {
+  var k = (window.EATGUARD_CONFIG && window.EATGUARD_CONFIG.deepseekApiKey) || "";
+  if (!k) k = lsGet("eatguard_deepseek_key", "");
   return k;
 }
-function setAIKey(k) { lsSet("eatguard_moonshot_key", k); }
+function setDeepSeekKey(k) { lsSet("eatguard_deepseek_key", k); }
+
+// DashScope Key（拍照识别）
+function getDashScopeKey() {
+  var k = (window.EATGUARD_CONFIG && window.EATGUARD_CONFIG.dashscopeApiKey) || "";
+  if (!k) k = lsGet("eatguard_dashscope_key", "");
+  return k;
+}
+function setDashScopeKey(k) { lsSet("eatguard_dashscope_key", k); }
 
 var AI_FOOD_PROMPT = [
   "你是一名专业的中国食物营养估算师。请根据输入（图片或文字描述）估算这餐/这份食物的营养成分。",
@@ -975,30 +987,11 @@ function parseAIJSON(content) {
   throw { code: "BAD_JSON" };
 }
 
-// 调用 Moonshot Chat Completions API
-async function callMoonshotAI(opts) {
-  var key = getAIKey();
-  if (!key) throw { code: "NO_KEY" };
-  var isVision = !!opts.imageBase64;
-  var model = isVision ? "moonshot-v1-8k-vision-preview" : "moonshot-v1-8k";
-  var userContent;
-  if (isVision) {
-    userContent = [
-      { type: "image_url", image_url: { url: opts.imageBase64 } },
-      { type: "text", text: opts.text || AI_FOOD_PROMPT },
-    ];
-  } else {
-    userContent = (opts.text ? "用户描述：" + opts.text + "\n\n" : "") + AI_FOOD_PROMPT;
-  }
-  var body = {
-    model: model,
-    messages: [{ role: "user", content: userContent }],
-    temperature: 0.2,
-    response_format: { type: "json_object" },
-  };
-  var res = await fetch("https://api.moonshot.cn/v1/chat/completions", {
+// 通用 OpenAI 兼容请求封装
+async function callOpenAICompat(endpoint, apiKey, body) {
+  var res = await fetch(endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -1009,6 +1002,46 @@ async function callMoonshotAI(opts) {
   var content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
   if (!content) throw { code: "EMPTY" };
   return parseAIJSON(content);
+}
+
+// 文字描述 → DeepSeek（https://api.deepseek.com/v1/chat/completions, deepseek-chat）
+async function callDeepSeekAI(text) {
+  var key = getDeepSeekKey();
+  if (!key) throw { code: "NO_KEY" };
+  var userContent = (text ? "用户描述：" + text + "\n\n" : "") + AI_FOOD_PROMPT;
+  return callOpenAICompat("https://api.deepseek.com/v1/chat/completions", key, {
+    model: "deepseek-chat",
+    messages: [{ role: "user", content: userContent }],
+    temperature: 0.2,
+    response_format: { type: "json_object" },
+  });
+}
+
+// 拍照识别 → 通义千问 Qwen-VL（DashScope 兼容模式）
+// content 必须是数组：先 text 后 image_url（注意：DashScope 与 Kimi 顺序/格式不同）
+async function callQwenVLAI(imageBase64) {
+  var key = getDashScopeKey();
+  if (!key) throw { code: "NO_KEY" };
+  return callOpenAICompat("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", key, {
+    model: "qwen-vl-plus",
+    messages: [{
+      role: "user",
+      content: [
+        { type: "text", text: AI_FOOD_PROMPT },
+        { type: "image_url", image_url: { url: imageBase64 } },
+      ],
+    }],
+    temperature: 0.2,
+    response_format: { type: "json_object" },
+  });
+}
+
+// 统一入口：文字走 DeepSeek，图片走 Qwen-VL
+async function callAIAnalyze(opts) {
+  if (opts.imageBase64) {
+    return callQwenVLAI(opts.imageBase64);
+  }
+  return callDeepSeekAI(opts.text || "");
 }
 
 // 图片压缩：宽度不超过 1024px，JPEG 0.8，返回 DataURL(base64)
@@ -1076,10 +1109,6 @@ function AITextInputModal() {
     '<div class="font-semibold mb-2">📝 文字描述</div>',
     '<div class="text-xs text-slate-500 mb-2">描述你吃了什么，例如："早餐吃了一碗小米粥，一个茶叶蛋，半根油条"</div>',
     '<textarea id="aiTextInput" rows="3" placeholder="请输入食物描述..." style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff;resize:none"></textarea>',
-    '<div id="aiKeyRow" style="display:none;margin-top:10px">',
-    '<div class="text-xs text-slate-500 mb-1">AI API Key（未配置，可在此临时填写，仅保存在本机）</div>',
-    '<input id="aiKeyInput" type="password" placeholder="sk-..." style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:14px;box-sizing:border-box;background:#fff" />',
-    '</div>',
     '<div id="aiLoading" style="display:none;margin-top:12px;text-align:center;padding:14px 0">',
     '<div style="display:inline-block;width:22px;height:22px;border:3px solid #E5E7EB;border-top-color:var(--brand);border-radius:50%;animation:aiSpin 0.8s linear infinite"></div>',
     '<div class="text-sm mt-2" style="color:var(--brand)">AI 正在分析...</div>',
@@ -1563,6 +1592,32 @@ function bindClicks() {
     el.addEventListener("click", handler);
     el.addEventListener("touchend", handler);
   });
+}
+
+// 设置页：AI 双引擎 Key 保存
+function bindSettingsAIKeys() {
+  var btnDS = $app.querySelector("#aiKeySaveDS");
+  var inputDS = $app.querySelector("#aiKeyDeepSeek");
+  if (btnDS && inputDS) {
+    btnDS.addEventListener("click", function() {
+      var v = (inputDS.value || "").trim();
+      if (v) setDeepSeekKey(v);
+      else { lsSet("eatguard_deepseek_key", ""); }
+      setToast(v ? "DeepSeek Key 已保存" : "已清除 DeepSeek Key");
+      render();
+    });
+  }
+  var btnDash = $app.querySelector("#aiKeySaveDash");
+  var inputDash = $app.querySelector("#aiKeyDash");
+  if (btnDash && inputDash) {
+    btnDash.addEventListener("click", function() {
+      var v = (inputDash.value || "").trim();
+      if (v) setDashScopeKey(v);
+      else { lsSet("eatguard_dashscope_key", ""); }
+      setToast(v ? "通义千问 Key 已保存" : "已清除通义千问 Key");
+      render();
+    });
+  }
 }
 
 // -----------------------------
@@ -2440,6 +2495,48 @@ function SettingsPage() {
     `,
   });
 
+  // ===== AI 识别双引擎配置 =====
+  const dsKey = getDeepSeekKey();
+  const dsKeyDisplay = dsKey ? "已配置 ✓" : "未配置";
+  const dashKey = getDashScopeKey();
+  const dashKeyDisplay = dashKey ? "已配置 ✓" : "未配置";
+
+  const aiCard = Card({
+    className: "mt-4",
+    inner: `
+      <div class="font-semibold">AI 识别</div>
+      <div class="text-xs text-slate-500 mt-1">双引擎：文字描述用 DeepSeek，拍照识别用通义千问</div>
+
+      <div class="mt-3">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs text-slate-600">DeepSeek API Key <span class="text-slate-400">（用于文字描述识别）</span></span>
+          <span class="text-xs ${dsKey ? 'text-emerald-600' : 'text-amber-600'}">${dsKeyDisplay}</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input id="aiKeyDeepSeek" type="password" placeholder="sk-..." value="${escapeHtml(dsKey)}" style="flex:1;min-width:0;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:14px;box-sizing:border-box;background:#fff" />
+          <button id="aiKeySaveDS" class="tap" style="padding:0 16px;border:none;border-radius:10px;background:var(--brand);color:#fff;font-size:13px;font-weight:500;cursor:pointer">保存</button>
+        </div>
+        <a href="https://platform.deepseek.com/" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;font-size:12px;color:var(--brand);text-decoration:underline">获取 DeepSeek API Key →</a>
+      </div>
+
+      <div class="mt-4">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs text-slate-600">通义千问 DashScope API Key <span class="text-slate-400">（用于拍照识别）</span></span>
+          <span class="text-xs ${dashKey ? 'text-emerald-600' : 'text-amber-600'}">${dashKeyDisplay}</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input id="aiKeyDash" type="password" placeholder="sk-..." value="${escapeHtml(dashKey)}" style="flex:1;min-width:0;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:14px;box-sizing:border-box;background:#fff" />
+          <button id="aiKeySaveDash" class="tap" style="padding:0 16px;border:none;border-radius:10px;background:var(--brand);color:#fff;font-size:13px;font-weight:500;cursor:pointer">保存</button>
+        </div>
+        <a href="https://dashscope.aliyun.com/" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;font-size:12px;color:var(--brand);text-decoration:underline">获取通义千问 API Key →</a>
+      </div>
+
+      <div class="text-xs text-slate-400 mt-3 leading-relaxed">
+        纯前端 Demo 场景下 Key 仅保存在本机浏览器（localStorage）；正式上线请改由后端转发，避免 Key 泄露。
+      </div>
+    `,
+  });
+
   const disclaimer = `
     <div class="mt-4 text-xs text-slate-400 text-center leading-relaxed px-4">
       本应用中的营养建议基于一般膳食指南，仅供参考，不能替代医生或注册营养师的专业建议。如有特殊健康状况，请咨询专业人士。
@@ -2455,6 +2552,7 @@ function SettingsPage() {
       ${proteinCard}
       ${baselineCard}
       ${tech}
+      ${aiCard}
       ${disclaimer}
     `,
   });
@@ -3075,8 +3173,8 @@ function bindQuickRecordCustomForm() {
 
   function aiErrorToast(err) {
     var code = err && err.code ? err.code : "";
-    if (code === "NO_KEY") setToast("未配置 AI Key，请在文字描述弹窗中填写一次");
-    else if (code === "UNAUTHORIZED") setToast("AI Key 无效，请检查后重试");
+    if (code === "NO_KEY") setToast("请先配置对应 API Key（见设置页）");
+    else if (code === "UNAUTHORIZED") setToast("API Key 无效，请检查后重试");
     else if (code === "BAD_JSON") { setToast("AI 识别出错，已为您切换到手动输入"); }
     else setToast("网络不稳定，请检查连接后重试");
   }
@@ -3135,28 +3233,24 @@ function bindQuickRecordCustomForm() {
     });
   }
 
-  // 拍照识别
+  // 拍照识别（→ 通义千问 Qwen-VL）
   if (aiPhotoBtn && aiPhotoInput) {
     aiPhotoBtn.addEventListener("click", function() {
+      // 前置校验：拍照需要 DashScope Key
+      if (!getDashScopeKey()) {
+        setToast("请先配置通义千问 API Key（见设置页）");
+        return;
+      }
       aiPhotoInput.value = "";
       aiPhotoInput.click();
     });
     aiPhotoInput.addEventListener("change", function() {
       var file = aiPhotoInput.files && aiPhotoInput.files[0];
       if (!file) return;
-      if (!getAIKey()) {
-        // 未配置 Key：先弹出文字弹窗引导填写 Key
-        if (qrModalDiv) {
-          qrModalDiv.innerHTML = AITextInputModal();
-          qrModalDiv.style.display = "block";
-          bindAITextModal("photo");
-        }
-        return;
-      }
       setToast("图片压缩中...");
       compressImage(file, function(dataUrl) {
         if (!dataUrl) { setToast("图片处理失败，请重试"); return; }
-        // 弹出文字弹窗显示 loading 并执行识别
+        // 弹出 loading 弹窗并执行识别
         if (qrModalDiv) {
           qrModalDiv.innerHTML = AITextInputModal();
           qrModalDiv.style.display = "block";
@@ -3172,9 +3266,14 @@ function bindQuickRecordCustomForm() {
     });
   }
 
-  // 文字识别
+  // 文字识别（→ DeepSeek）
   if (aiTextBtn) {
     aiTextBtn.addEventListener("click", function() {
+      // 前置校验：文字需要 DeepSeek Key
+      if (!getDeepSeekKey()) {
+        setToast("请先配置 DeepSeek API Key（见设置页）");
+        return;
+      }
       if (qrModalDiv) {
         qrModalDiv.innerHTML = AITextInputModal();
         qrModalDiv.style.display = "block";
@@ -3189,11 +3288,6 @@ function bindQuickRecordCustomForm() {
     overlay.addEventListener("click", function(e) {
       if (e.target === overlay) closeModal("#qrAITextOverlay");
     });
-    // 未配置 Key 时显示 Key 输入行
-    var keyRow = $app.querySelector("#aiKeyRow");
-    if (keyRow && !getAIKey()) keyRow.style.display = "block";
-    var keyInput = $app.querySelector("#aiKeyInput");
-    if (keyInput) keyInput.value = getAIKey();
 
     var cancelBtn = $app.querySelector("#aiTextCancel");
     if (cancelBtn) cancelBtn.addEventListener("click", function() {
@@ -3202,31 +3296,23 @@ function bindQuickRecordCustomForm() {
     var goBtn = $app.querySelector("#aiTextGo");
     if (goBtn) goBtn.addEventListener("click", function() {
       var text = ($app.querySelector("#aiTextInput")?.value || "").trim();
-      var key = $app.querySelector("#aiKeyInput") ? ($app.querySelector("#aiKeyInput").value || "").trim() : "";
-      if (key) setAIKey(key);
       if (mode === "text" && !text) { setToast("请先输入食物描述"); return; }
       showAILoading(true);
       runAIAnalysis({ imageBase64: imageBase64 || null, text: mode === "text" ? text : null });
     });
   }
 
-  // 执行 AI 请求
+  // 执行 AI 请求：图片→Qwen-VL，文字→DeepSeek
   async function runAIAnalysis(opts) {
     try {
-      var result = await callMoonshotAI(opts);
+      var result = await callAIAnalyze(opts);
       if (!result || typeof result !== "object") throw { code: "BAD_JSON" };
       showAIResult(result, opts.imageBase64 ? "photo" : "text");
     } catch (err) {
       console.error("AI analysis failed:", err);
       showAILoading(false);
       if (err && err.code === "NO_KEY") {
-        // 打开文字弹窗引导填 Key
-        if (qrModalDiv) {
-          qrModalDiv.innerHTML = AITextInputModal();
-          qrModalDiv.style.display = "block";
-          bindAITextModal(opts.imageBase64 ? "photo" : "text", opts.imageBase64);
-        }
-        setToast("请先填写 AI API Key");
+        setToast(opts.imageBase64 ? "请先配置通义千问 API Key（见设置页）" : "请先配置 DeepSeek API Key（见设置页）");
       } else {
         aiErrorToast(err);
       }
@@ -3506,6 +3592,7 @@ function render() {
   if (path === "settings") {
     $app.innerHTML = SettingsPage();
     bindClicks();
+    bindSettingsAIKeys();
     return;
   }
 

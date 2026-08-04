@@ -155,7 +155,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804235202";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260805001600";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -504,6 +504,7 @@ const LS_KEYS = {
   profileExtras: "eg_profile_extras",
   meals: "eg_meals",
   targets: "eg_daily_targets",
+  customFoods: "eatguard_custom_foods",
 };
 
 function getUserId() {
@@ -664,8 +665,11 @@ async function dbListMeals(userId) {
     console.warn("Supabase list meals failed, fallback to local.", error);
     return local;
   }
-  lsSet(LS_KEYS.meals, data || []);
-  return data || [];
+  // 合并：Supabase 返回的数据 ∪ 本地数据（避免空表覆盖本地刚保存的记录）
+  const remote = data || [];
+  const merged = remote.concat(local.filter((lm) => !remote.some((rm) => rm.id === lm.id)));
+  lsSet(LS_KEYS.meals, merged);
+  return merged;
 }
 
 async function dbUpsertDailyTarget(row) {
@@ -707,8 +711,11 @@ async function dbListDailyTargets(userId) {
     console.warn("Supabase list daily_targets failed, fallback to local.", error);
     return local;
   }
-  lsSet(LS_KEYS.targets, data || []);
-  return data || [];
+  // 合并：避免空表覆盖本地刚保存的目标
+  const remote = data || [];
+  const merged = remote.concat(local.filter((lt) => !remote.some((rt) => rt.date === lt.date && rt.user_id === lt.user_id)));
+  lsSet(LS_KEYS.targets, merged);
+  return merged;
 }
 
 // -----------------------------

@@ -155,7 +155,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260805001600";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260805064153";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -3472,25 +3472,31 @@ function bindQuickRecordCustomForm() {
   // data: {name, amount, cal, protein, fat, carbs, source}
   // 成功返回 true，失败返回 false（已 toast 提示）
   async function saveQuickRecordMeal(data) {
+    console.log("保存前数据:", JSON.stringify(data));
     try {
       console.log("💾 保存记录:", data.name, data.cal, "kcal, source=", data.source);
       var customFoods = lsGet(LS_KEYS.customFoods, []);
       customFoods.push({ name: data.name, calories: data.cal, protein: data.protein, fat: data.fat, carbs: data.carbs, amount: data.amount || "1份", category: state.qrCategory || "其他", createdAt: new Date().toISOString() });
       lsSet(LS_KEYS.customFoods, customFoods);
+      console.log("✅ customFoods 已写入, 现存:", lsGet(LS_KEYS.customFoods, []).length, "条");
 
       var items = [{ name: data.name, amount: data.amount || "1份", calories: data.cal, protein: data.protein, fat: data.fat, carbs: data.carbs }];
       var meal = { id: uid(), user_id: state.userId, photo_url: "", food_items: items, eaten_percentage: 100, meal_total_calories: data.cal, meal_total_protein: data.protein, source: data.source || "quickrecord", created_at: new Date().toISOString() };
       await dbInsertMeal(meal);
+      console.log("已存入localStorage eg_meals:", localStorage.getItem(LS_KEYS.meals));
       var dateStr = todayStr();
       var row = await ensureTodayRows(state.userId, state.profile, dateStr);
       await dbUpsertDailyTarget({ user_id: row.user_id, date: row.date, actual_calories: (row.actual_calories ?? 0) + data.cal, is_baseline_day: isBaseline(state.profile, dateStr), target_calories: row.target_calories });
       state.profile = await maybeCompleteBaseline(state.userId, state.profile, dateStr);
       await ensureTodayTarget(state.userId, state.profile, dateStr);
       await reloadData();
+      console.log("✅ reloadData 后 state.meals 条数:", state.meals.length, "| 今日:", state.meals.filter(function(m) { return todayStr(new Date(m.created_at)) === todayStr(); }).length, "条");
       // 关闭快速记录弹窗 + 跳回首页，让用户立即看到新记录
       var modalDiv = $app.querySelector("#qrModal");
       if (modalDiv) { modalDiv.style.display = "none"; modalDiv.innerHTML = ""; }
+      // 强制重绘首页：直接 render 而非仅改 hash（若已在 home，hashchange 不触发）
       navigate("home");
+      render();
       return true;
     } catch (err) {
       console.error("QuickRecord save failed:", err);

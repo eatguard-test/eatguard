@@ -140,7 +140,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804195403";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804201404";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -1018,27 +1018,54 @@ async function callAIAnalyze(opts) {
 }
 
 // 图片压缩：宽度不超过 maxWidth（默认 1024px），JPEG 0.8，返回 DataURL(base64)
-// 用 FileReader 方式，兼容 Safari/HEIC；读取失败时回调 null
+// 用 FileReader 方式，兼容 Safari/HEIC；全程 try-catch 保证回调必定触发（失败回调 null）
 function compressImage(file, callback, maxWidth) {
   var MAX_W = maxWidth || 1024;
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    var img = new Image();
-    img.onload = function() {
-      var scale = Math.min(1, MAX_W / img.width);
-      var w = Math.max(1, Math.round(img.width * scale));
-      var h = Math.max(1, Math.round(img.height * scale));
-      var canvas = document.createElement("canvas");
-      canvas.width = w; canvas.height = h;
-      var ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, w, h);
-      callback(canvas.toDataURL("image/jpeg", 0.8));
+  var done = false;
+  function finish(dataUrl) {
+    if (done) return;
+    done = true;
+    callback(dataUrl);
+  }
+  try {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        var img = new Image();
+        img.onload = function() {
+          try {
+            var scale = Math.min(1, MAX_W / img.width);
+            var w = Math.max(1, Math.round(img.width * scale));
+            var h = Math.max(1, Math.round(img.height * scale));
+            var canvas = document.createElement("canvas");
+            canvas.width = w; canvas.height = h;
+            var ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, w, h);
+            finish(canvas.toDataURL("image/jpeg", 0.8));
+          } catch (err) {
+            console.error("[EatGuard] 压缩失败，回退原图:", err);
+            finish(e.target.result); // 降级：直接用原始 dataURL
+          }
+        };
+        img.onerror = function() {
+          console.error("[EatGuard] 图片解码失败 (onerror)");
+          finish(null);
+        };
+        img.src = e.target.result;
+      } catch (err) {
+        console.error("[EatGuard] 图片处理异常:", err);
+        finish(null);
+      }
     };
-    img.onerror = function() { callback(null); };
-    img.src = e.target.result;
-  };
-  reader.onerror = function() { callback(null); };
-  reader.readAsDataURL(file);
+    reader.onerror = function() {
+      console.error("[EatGuard] FileReader 读取失败");
+      finish(null);
+    };
+    reader.readAsDataURL(file);
+  } catch (err) {
+    console.error("[EatGuard] compressImage 异常:", err);
+    finish(null);
+  }
 }
 
 // AI 结果确认卡片（可编辑）
@@ -3182,21 +3209,32 @@ function bindQuickRecordCustomForm() {
     aiPhotoInput.addEventListener("change", function() {
       var file = aiPhotoInput.files && aiPhotoInput.files[0];
       if (!file) return;
+      console.log("📸 文件已选择:", file.name, file.type, file.size);
       setToast("图片压缩中...");
       compressImage(file, function(dataUrl) {
-        if (!dataUrl) { setToast("图片处理失败，请重试"); return; }
-        // 弹出 loading 弹窗并执行识别
-        if (qrModalDiv) {
-          qrModalDiv.innerHTML = AITextInputModal("photo");
-          qrModalDiv.style.display = "block";
-          bindAITextModal("photo", dataUrl);
-          showAILoading(true);
-          var goBtn = $app.querySelector("#aiTextGo");
-          if (goBtn) goBtn.style.display = "none";
-          var cancelBtn = $app.querySelector("#aiTextCancel");
-          if (cancelBtn) cancelBtn.style.display = "none";
-          runAIAnalysis({ imageBase64: dataUrl });
+        if (!dataUrl) {
+          console.error("❌ 图片压缩失败（回调 null）");
+          setToast("图片处理失败，请重试");
+          return;
         }
+        console.log("✅ 压缩完成，base64长度:", dataUrl.length);
+        // 弹出 loading 弹窗并执行识别
+        if (!qrModalDiv) {
+          console.error("❌ #qrModal 不存在，无法继续");
+          setToast("界面异常，请返回重试");
+          return;
+        }
+        qrModalDiv.innerHTML = AITextInputModal("photo");
+        qrModalDiv.style.display = "block";
+        bindAITextModal("photo", dataUrl);
+        showAILoading(true);
+        var goBtn = $app.querySelector("#aiTextGo");
+        if (goBtn) goBtn.style.display = "none";
+        var cancelBtn = $app.querySelector("#aiTextCancel");
+        if (cancelBtn) cancelBtn.style.display = "none";
+        setToast("正在识别食物...");
+        console.log("🚀 正在发送图片识别请求 → /api/ai-image (base64 " + (dataUrl.length / 1024).toFixed(0) + "KB)");
+        runAIAnalysis({ imageBase64: dataUrl });
       });
     });
   }
@@ -3237,6 +3275,7 @@ function bindQuickRecordCustomForm() {
     try {
       var result = await callAIAnalyze(opts);
       if (!result || typeof result !== "object") throw { code: "BAD_JSON" };
+      console.log("✅ AI 识别成功:", result.name, result.calories_kcal, "kcal");
       showAIResult(result, opts.imageBase64 ? "photo" : "text");
     } catch (err) {
       console.error("AI analysis failed:", err);

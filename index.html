@@ -155,7 +155,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804221131";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804232846";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -2174,6 +2174,30 @@ function RecognizePage() {
     ? `<img src="${escapeHtml(d.photoUrl)}" class="w-full rounded-2xl object-cover max-h-[280px]" />`
     : `<div class="rounded-2xl bg-white/70 border border-slate-200 p-4 text-sm text-slate-600">还没有选择照片。你可以先回上一步。</div>`;
 
+  // AI 识别中：显示 loading
+  if (d?.aiLoading) {
+    return PageShell({
+      title: "识别结果",
+      activeTab: "home",
+      fab: false,
+      rightHtml: SmallButton({ label: "返回", onClick: "goCapture" }),
+      body: `
+        ${Card({ inner: photo })}
+        <div class="mt-4">
+          ${Card({
+            inner: `
+              <div class="text-center py-6">
+                <div style="display:inline-block;width:28px;height:28px;border:3px solid #E5E7EB;border-top-color:var(--brand);border-radius:50%;animation:aiSpin 0.8s linear infinite"></div>
+                <div class="text-sm mt-3" style="color:var(--brand)">AI 正在识别图片...</div>
+                <div class="text-xs text-slate-500 mt-1">识别完成后自动显示结果</div>
+              </div>
+            `,
+          })}
+        </div>
+      `,
+    });
+  }
+
   const items = (d?.items || []).map((it) => {
     const p = Number(it.protein) || 0;
     const proteinStr = p > 0 ? ` · 蛋白质 ${formatGram(p)}g` : "";
@@ -2201,7 +2225,7 @@ function RecognizePage() {
       <div class="mt-4">
         ${Card({
           inner: `
-            <div class="text-sm text-slate-500">模拟 AI 识别（可编辑比例）</div>
+            <div class="text-sm text-slate-500">AI 识别结果（可编辑比例）</div>
             <div class="mt-2 divide-y divide-slate-200/70">${items.join("")}</div>
             ${proteinLine}
             ${Divider()}
@@ -2222,7 +2246,7 @@ function RecognizePage() {
             </div>
             <div class="mt-4">${Button({ label: "继续", onClick: "toReview" })}</div>
             <div class="text-xs text-slate-500 mt-3 leading-relaxed">
-              TODO：这里未来会接入真实视觉模型（例如 GPT-4V）返回 food_items。
+              由通义千问 Qwen-VL 识别，可在后续页面调整份量。
             </div>
           `,
         })}
@@ -2723,6 +2747,7 @@ const actions = {
         eaten_percentage: eatenPercentage,
         meal_total_calories: total,
         meal_total_protein: totalProtein,
+        source: d.aiSource || "capture",
         created_at: new Date().toISOString(),
       };
 
@@ -3319,7 +3344,10 @@ function bindQuickRecordCustomForm() {
       state.profile = await maybeCompleteBaseline(state.userId, state.profile, dateStr);
       await ensureTodayTarget(state.userId, state.profile, dateStr);
       await reloadData();
-      render(); // 重绘，确保新增记录/自定义食物立即显示
+      // 关闭快速记录弹窗 + 跳回首页，让用户立即看到新记录
+      var modalDiv = $app.querySelector("#qrModal");
+      if (modalDiv) { modalDiv.style.display = "none"; modalDiv.innerHTML = ""; }
+      navigate("home");
       return true;
     } catch (err) {
       console.error("QuickRecord save failed:", err);
@@ -3443,15 +3471,39 @@ function bindCaptureButtons() {
     console.log("[EatGuard] change event, files:", input?.files?.length, file?.name);
     if (!file) return;
 
-    // 先存 draft 再 render，确保页面刷新后能看到预览
-    fileToDataUrl(file).then((url) => {
-      console.log("[EatGuard] dataUrl ready, length:", url.length);
-      state.draft = { photoUrl: url, items: pickSimulatedItems(), eatenPercentage: 100 };
+    setToast("图片压缩中...");
+    compressImage(file, async (dataUrl) => {
+      if (!dataUrl) {
+        setToast("图片处理失败，请重试。");
+        return;
+      }
+      console.log("[EatGuard] dataUrl ready, length:", dataUrl.length);
+      // 先显示照片预览，同时发起 AI 识别
+      state.draft = { photoUrl: dataUrl, items: [], eatenPercentage: 100, aiLoading: true };
+      render();
+      setToast("正在 AI 识别食物...");
+      console.log("🚀 Capture 流程发送图片识别请求 → /api/ai-image");
+      try {
+        const result = await callAIAnalyze({ imageBase64: dataUrl });
+        if (!result || typeof result !== "object") throw { code: "BAD_JSON" };
+        const items = [{
+          name: result.name || "未命名食物",
+          amount: result.amount || (result.weight_g ? result.weight_g + "g" : "1份"),
+          calories: Number(result.calories_kcal) || 0,
+          protein: Number(result.protein_g) || 0,
+          fat: Number(result.fat_g) || 0,
+          carbs: Number(result.carbs_g) || 0,
+        }];
+        console.log("[EatGuard] ✅ AI 识别完成:", items[0].name, items[0].calories, "kcal, source=ai_estimate");
+        state.draft = { photoUrl: dataUrl, items: items, eatenPercentage: 100, aiLoading: false, aiSource: "ai_estimate" };
+        setToast("AI 识别完成：" + items[0].name);
+      } catch (err) {
+        console.error("[EatGuard] AI 识别失败，使用示例数据兜底:", err);
+        state.draft = { photoUrl: dataUrl, items: pickSimulatedItems(), eatenPercentage: 100, aiLoading: false };
+        setToast("AI 识别失败，已用示例数据，可手动修改");
+      }
       render();
       setTimeout(() => setToast("照片已选择"), 300);
-    }).catch((err) => {
-      console.error("[EatGuard] 图片处理失败:", err);
-      setToast("图片处理失败，请重试。");
     });
   };
 

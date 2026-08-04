@@ -155,7 +155,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804232846";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804235202";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -840,35 +840,35 @@ function formatGram(g) {
 // ===== 快速记录预设食物 =====
 const FOOD_PRESETS = {
   "饮品": [
-    { emoji: "🥛", name: "牛奶", amount: "250ml", calories: 150, protein: 8 },
-    { emoji: "🥛", name: "豆浆", amount: "250ml", calories: 120, protein: 6 },
-    { emoji: "🥥", name: "椰奶", amount: "250ml", calories: 180, protein: 2 },
-    { emoji: "🥤", name: "可乐", amount: "330ml", calories: 140, protein: 0 },
-    { emoji: "🧋", name: "奶茶", amount: "500ml", calories: 300, protein: 4 },
-    { emoji: "☕", name: "美式咖啡", amount: "1杯", calories: 5, protein: 0 },
+    { emoji: "🥛", name: "牛奶", amount: "250ml", weight_g: 250, calories: 150, protein: 8 },
+    { emoji: "🥛", name: "豆浆", amount: "250ml", weight_g: 250, calories: 120, protein: 6 },
+    { emoji: "🥥", name: "椰奶", amount: "250ml", weight_g: 250, calories: 180, protein: 2 },
+    { emoji: "🥤", name: "可乐", amount: "330ml", weight_g: 330, calories: 140, protein: 0 },
+    { emoji: "🧋", name: "奶茶", amount: "500ml", weight_g: 500, calories: 300, protein: 4 },
+    { emoji: "☕", name: "美式咖啡", amount: "1杯", weight_g: 200, calories: 5, protein: 0 },
   ],
   "水果": [
-    { emoji: "🍎", name: "苹果", amount: "1个", calories: 80, protein: 0 },
-    { emoji: "🍌", name: "香蕉", amount: "1根", calories: 90, protein: 1 },
-    { emoji: "🍊", name: "橙子", amount: "1个", calories: 60, protein: 1 },
-    { emoji: "🍉", name: "西瓜", amount: "1片", calories: 40, protein: 0 },
+    { emoji: "🍎", name: "苹果", amount: "1个", weight_g: 150, calories: 80, protein: 0 },
+    { emoji: "🍌", name: "香蕉", amount: "1根", weight_g: 120, calories: 90, protein: 1 },
+    { emoji: "🍊", name: "橙子", amount: "1个", weight_g: 150, calories: 60, protein: 1 },
+    { emoji: "🍉", name: "西瓜", amount: "1片", weight_g: 100, calories: 40, protein: 0 },
   ],
   "零食": [
-    { emoji: "🍟", name: "薯片", amount: "1包(50g)", calories: 300, protein: 3 },
-    { emoji: "🍪", name: "饼干", amount: "3片", calories: 150, protein: 2 },
-    { emoji: "🥜", name: "坚果", amount: "1把(30g)", calories: 180, protein: 6 },
-    { emoji: "🍫", name: "巧克力", amount: "1块", calories: 100, protein: 1 },
+    { emoji: "🍟", name: "薯片", amount: "1包(50g)", weight_g: 50, calories: 300, protein: 3 },
+    { emoji: "🍪", name: "饼干", amount: "3片", weight_g: 90, calories: 150, protein: 2 },
+    { emoji: "🥜", name: "坚果", amount: "1把(30g)", weight_g: 30, calories: 180, protein: 6 },
+    { emoji: "🍫", name: "巧克力", amount: "1块", weight_g: 40, calories: 100, protein: 1 },
   ],
   "主食": [
-    { emoji: "🍚", name: "米饭", amount: "1碗(200g)", calories: 230, protein: 4 },
-    { emoji: "🍜", name: "面条", amount: "1碗", calories: 280, protein: 8 },
-    { emoji: "🍞", name: "吐司", amount: "1片", calories: 80, protein: 3 },
-    { emoji: "🥟", name: "馒头", amount: "1个", calories: 220, protein: 6 },
+    { emoji: "🍚", name: "米饭", amount: "1碗(200g)", weight_g: 200, calories: 230, protein: 4 },
+    { emoji: "🍜", name: "面条", amount: "1碗", weight_g: 200, calories: 280, protein: 8 },
+    { emoji: "🍞", name: "吐司", amount: "1片", weight_g: 30, calories: 80, protein: 3 },
+    { emoji: "🥟", name: "馒头", amount: "1个", weight_g: 100, calories: 220, protein: 6 },
   ],
   "蛋奶": [
-    { emoji: "🥚", name: "鸡蛋", amount: "1个", calories: 70, protein: 6 },
-    { emoji: "🥛", name: "酸奶", amount: "1盒(200g)", calories: 140, protein: 5 },
-    { emoji: "🧈", name: "奶酪", amount: "1片", calories: 100, protein: 6 },
+    { emoji: "🥚", name: "鸡蛋", amount: "1个", weight_g: 60, calories: 70, protein: 6 },
+    { emoji: "🥛", name: "酸奶", amount: "1盒(200g)", weight_g: 200, calories: 140, protein: 5 },
+    { emoji: "🧈", name: "奶酪", amount: "1片", weight_g: 20, calories: 100, protein: 6 },
   ],
 };
 const FOOD_CATEGORIES = ["饮品", "水果", "零食", "主食", "蛋奶"];
@@ -921,6 +921,64 @@ function parseWeightToGrams(amountStr) {
   if (s.includes("把")) return Math.round(num * 80);  // 1把≈80g
   if (s.includes("g") || s.includes("克")) return Math.round(num);
   return Math.round(num); // 默认视为克
+}
+
+// ===== 重量自动换算工具 =====
+// 1 位小数（蛋白质/脂肪/碳水）
+function round1(n) { return Math.round((Number(n) || 0) * 10) / 10; }
+
+// 从 AI 结果提取"每 100g"营养数据
+// 优先级：AI 显式返回 per_100g 字段 → 由当前重量反推 → 内置食物库 food_db 兜底
+function getPer100FromAIResult(result) {
+  if (!result) return null;
+  // 1) AI 显式返回 per_100g
+  if (result.calories_per_100g || result.caloriesPer100g) {
+    return {
+      cal: Number(result.calories_per_100g ?? result.caloriesPer100g) || 0,
+      protein: Number(result.protein_per_100g ?? result.proteinPer100g) || 0,
+      fat: Number(result.fat_per_100g ?? result.fatPer100g) || 0,
+      carbs: Number(result.carbs_per_100g ?? result.carbsPer100g) || 0,
+    };
+  }
+  // 2) 由当前重量与营养值反推（weight_g > 0 且有营养值时）
+  var w = Number(result.weight_g) || 0;
+  if (w > 0 && (result.calories_kcal || result.protein_g || result.fat_g || result.carbs_g)) {
+    return {
+      cal: Number(result.calories_kcal || 0) / w * 100,
+      protein: Number(result.protein_g || 0) / w * 100,
+      fat: Number(result.fat_g || 0) / w * 100,
+      carbs: Number(result.carbs_g || 0) / w * 100,
+    };
+  }
+  // 3) 内置食物库兜底（按名称查每 100g）
+  if (typeof window !== "undefined" && window.FOOD_DB && window.findFoodByName) {
+    try {
+      var hits = window.findFoodByName(result.name);
+      if (hits && hits.length) {
+        var f = hits[0];
+        return { cal: Number(f.calories_kcal) || 0, protein: Number(f.protein_g) || 0, fat: Number(f.fat_g) || 0, carbs: Number(f.carbs_g) || 0 };
+      }
+    } catch (e) {}
+  }
+  return null;
+}
+
+// 按重量换算营养：per100 {cal,protein,fat,carbs} × weightG/100
+function recalcNutrition(per100, weightG) {
+  var k = (Number(weightG) || 0) / 100;
+  return {
+    cal: Math.round((per100.cal || 0) * k),
+    protein: round1((per100.protein || 0) * k),
+    fat: round1((per100.fat || 0) * k),
+    carbs: round1((per100.carbs || 0) * k),
+  };
+}
+
+// 校验重量输入：为空/0 提示输入；>5000 提示确认
+function checkWeightInput(w) {
+  if (!w || w <= 0) { setToast("请输入重量"); return false; }
+  if (w > 5000) { setToast("请确认重量是否正确"); return false; }
+  return true;
 }
 
 // AI 估算：根据名称关键词 + 重量 → {calories, protein}，无匹配返回 null
@@ -1092,6 +1150,9 @@ function compressImage(file, callback, maxWidth) {
 function AIRecognizeResultCard(result) {
   var low = Number(result.confidence) < 0.5;
   var warn = low ? '<div style="background:#FEF3C7;border:1px solid #F59E0B;color:#92400E;border-radius:10px;padding:8px 12px;font-size:12px;margin-bottom:12px">⚠️ AI 对此次识别不太确定（置信度 ' + Number(result.confidence || 0).toFixed(2) + '），请仔细核对</div>' : "";
+  // 提取 per-100g 数据（AI 字段 → 反推 → food_db），用于重量自动换算
+  var per100 = getPer100FromAIResult(result);
+  var per100Json = per100 ? JSON.stringify(per100).replace(/"/g, "&quot;") : "";
   var field = function(id, label, val, unit) {
     return '<div><div class="text-xs text-slate-500 mb-1">' + label + '</div>'
       + '<input id="' + id + '" type="text" inputmode="decimal" value="' + escapeHtml(val) + '" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;background:#fff;color:#1e293b;-webkit-text-fill-color:#1e293b;caret-color:#1e293b" />'
@@ -1103,14 +1164,16 @@ function AIRecognizeResultCard(result) {
     '<div style="padding:20px;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 16px);background:#FFFFFF">',
     '<div class="font-semibold mb-3" style="color:var(--brand)">🤖 AI 估算结果</div>',
     warn,
+    '<input type="hidden" id="aiPer100" value="' + per100Json + '" />',
     '<div style="display:flex;flex-direction:column;gap:10px">',
     field("aiName", "食物名称", result.name || "", ""),
     field("aiAmount", "份量", result.amount || "", ""),
-    field("aiWeight", "重量", result.weight_g ?? "", "g"),
+    field("aiWeight", "重量（修改后自动重算）", result.weight_g ?? "", "g"),
     field("aiCal", "热量", result.calories_kcal ?? "", "kcal"),
     field("aiProtein", "蛋白质", result.protein_g ?? "", "g"),
     field("aiFat", "脂肪", result.fat_g ?? "", "g"),
     field("aiCarbs", "碳水化合物", result.carbs_g ?? "", "g"),
+    per100 ? '<button id="aiRecalc" class="tap" style="width:100%;padding:10px;border:1.5px solid var(--brand);border-radius:10px;background:#fff;color:var(--brand);font-size:13px;font-weight:500;cursor:pointer">🔄 按新重量重新计算</button>' : '',
     '<div><div class="text-xs text-slate-500 mb-1">AI 估算依据</div>',
     '<div style="background:#f8fafc;border-radius:8px;padding:8px 10px;font-size:12px;color:#64748b;line-height:1.5">' + escapeHtml(result.notes || "（无说明）") + '</div></div>',
     '</div>',
@@ -2092,8 +2155,12 @@ function QuickRecordPage() {
 
 function QuickRecordConfirmModal(food, isCustom) {
   var count = state.qrCount || 1;
-  var cal = round(Number(food.calories || 0) * count);
-  var pro = round(Number(food.protein || 0) * count);
+  // 每份基准重量（food.weight_g 优先，否则从 amount 解析，默认 100g）
+  var baseG = Number(food.weight_g) || parseWeightToGrams(food.amount) || 100;
+  // 当前总重量：用户自定义重量优先，否则 = 每份重量 × 份数
+  var totalG = state.qrWeightG || baseG * count;
+  var cal = round(Number(food.calories || 0) / baseG * totalG);
+  var pro = round1(Number(food.protein || 0) / baseG * totalG);
   var name = food.name || "";
   var amount = food.amount || "";
   var emoji = food.emoji || "🍽️";
@@ -2118,8 +2185,14 @@ function QuickRecordConfirmModal(food, isCustom) {
     '<div id="qrCustomInput" style="display:' + (count > 2 ? 'block' : 'none') + ';margin-bottom:12px">',
     '<input id="qrCustomNum" type="number" min="1" max="20" value="' + count + '" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box" placeholder="份数" />',
     '</div>',
+    // 重量输入：修改后按比例自动重算热量/蛋白质
+    '<div class="text-sm text-slate-700 mb-1">重量（修改后自动重算）</div>',
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">',
+    '<input id="qrWeightNum" type="number" min="1" max="5000" value="' + totalG + '" style="flex:1;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box" />',
+    '<span class="text-sm text-slate-600">g</span>',
+    '</div>',
     '<div style="background:#f8fafc;border-radius:10px;padding:10px;text-align:center">',
-    '<div class="text-sm font-semibold">合计：' + (cal > 0 ? formatKcal(cal) + ' kcal' : '-- kcal') + ' · 蛋白质 ' + (pro > 0 ? formatGram(pro) + 'g' : '-- g') + '</div></div>',
+    '<div id="qrTotalDisplay" class="text-sm font-semibold">合计：' + (cal > 0 ? formatKcal(cal) + ' kcal' : '-- kcal') + ' · 蛋白质 ' + (pro > 0 ? formatGram(pro) + 'g' : '-- g') + '</div></div>',
     '</div>',
     '<div style="display:flex;border-top:1px solid rgba(15,23,42,0.06)">',
     '<button id="qrCancel" class="tap" style="flex:1;padding:16px;border:none;background:transparent;color:#999;font-size:15px;cursor:pointer;-webkit-tap-highlight-color:transparent">取消</button>',
@@ -2972,6 +3045,7 @@ function bindQuickRecord() {
       };
       state.qrFood = food;
       state.qrCount = 1;
+      state.qrWeightG = null; // 重置自定义重量，避免上次残留
       state.qrIsCustom = row.dataset.custom === "1";
       var modalDiv = $app.querySelector("#qrModal");
       if (modalDiv) {
@@ -3008,6 +3082,7 @@ function bindQuickRecordModal() {
 
   function updateDisplay(count) {
     state.qrCount = count;
+    state.qrWeightG = null; // 点份数按钮 → 回到按份数计算（重量框由渲染同步）
     var food = state.qrFood;
     if (!food) return;
     var modalDiv = $app.querySelector("#qrModal");
@@ -3040,6 +3115,28 @@ function bindQuickRecordModal() {
     });
   }
 
+  // ===== 重量输入：修改后按比例实时重算热量/蛋白质（不重建弹窗，保留焦点）=====
+  var food0 = state.qrFood;
+  var baseG = Number(food0 && food0.weight_g) || parseWeightToGrams(food0 && food0.amount) || 100;
+  var weightInput = $app.querySelector("#qrWeightNum");
+  if (weightInput) {
+    weightInput.addEventListener("input", function() {
+      var w = parseFloat(weightInput.value);
+      if (!checkWeightInput(w)) return;
+      state.qrWeightG = w;
+      var cal = Math.round(Number(food0.calories || 0) / baseG * w);
+      var pro = round1(Number(food0.protein || 0) / baseG * w);
+      var totalEl = $app.querySelector("#qrTotalDisplay");
+      if (totalEl) totalEl.innerHTML = '合计：' + (cal > 0 ? formatKcal(cal) + ' kcal' : '-- kcal') + ' · 蛋白质 ' + (pro > 0 ? formatGram(pro) + 'g' : '-- g');
+      console.log("🔄 快速记录重量换算:", w + "g →", cal, "kcal, 蛋白", pro, "g");
+    });
+    // blur 时校验边界
+    weightInput.addEventListener("blur", function() {
+      var w = parseFloat(weightInput.value);
+      if (w && w > 5000) { setToast("请确认重量是否正确"); weightInput.focus(); }
+    });
+  }
+
   var cancelBtn = $app.querySelector("#qrCancel");
   if (cancelBtn) {
     cancelBtn.addEventListener("click", function() {
@@ -3054,11 +3151,15 @@ function bindQuickRecordModal() {
       var food = state.qrFood;
       var count = state.qrCount || 1;
       if (!food) return;
+      var totalG = state.qrWeightG || baseG * count;
+      var ratio = totalG / baseG;
+      var calVal = Math.round(Number(food.calories || 0) * ratio);
+      var proVal = round1(Number(food.protein || 0) * ratio);
       var items = [{
         name: food.name,
-        amount: (food.amount || "") + " ×" + count + "份",
-        calories: Number(food.calories || 0) * count,
-        protein: Number(food.protein || 0) * count,
+        amount: (food.amount || "") + "（共" + totalG + "g）",
+        calories: calVal,
+        protein: proVal,
       }];
       var meal = {
         id: uid(),
@@ -3081,7 +3182,7 @@ function bindQuickRecordModal() {
         state.profile = await maybeCompleteBaseline(state.userId, state.profile, dateStr);
         await ensureTodayTarget(state.userId, state.profile, dateStr);
         await reloadData();
-        setToast("已记录：" + food.name + " ×" + count + "份");
+        setToast("已记录：" + food.name + "（" + totalG + "g）");
         navigate("home");
       } catch (err) {
         console.error("QuickRecord save failed:", err);
@@ -3216,6 +3317,41 @@ function bindQuickRecordCustomForm() {
       if (state.aiLastMode === "photo" && aiPhotoBtn) aiPhotoBtn.click();
       else if (state.aiLastMode === "text" && aiTextBtn) aiTextBtn.click();
     });
+
+    // ===== 重量自动换算：修改重量 → 热量/蛋白质/脂肪/碳水按比例重算 =====
+    var weightInput = $app.querySelector("#aiWeight");
+    var per100El = $app.querySelector("#aiPer100");
+    var per100 = null;
+    if (per100El) {
+      try { per100 = JSON.parse(per100El.value); } catch (e) { per100 = null; }
+    }
+    function recalcFromWeight() {
+      if (!per100) return;
+      var w = parseFloat(weightInput.value);
+      if (!checkWeightInput(w)) return;
+      var r = recalcNutrition(per100, w);
+      var calInput = $app.querySelector("#aiCal");
+      var proInput = $app.querySelector("#aiProtein");
+      var fatInput = $app.querySelector("#aiFat");
+      var carbsInput = $app.querySelector("#aiCarbs");
+      if (calInput) calInput.value = r.cal;
+      if (proInput) proInput.value = r.protein;
+      if (fatInput) fatInput.value = r.fat;
+      if (carbsInput) carbsInput.value = r.carbs;
+      var amountInput = $app.querySelector("#aiAmount");
+      if (amountInput && !String(amountInput.value).trim()) amountInput.value = w + "g";
+      console.log("🔄 重量换算:", w + "g →", r.cal, "kcal, 蛋白", r.protein, "g, 脂肪", r.fat, "g, 碳水", r.carbs, "g");
+      setToast("已按 " + w + "g 重新计算");
+    }
+    if (weightInput) {
+      weightInput.addEventListener("blur", recalcFromWeight);
+      weightInput.addEventListener("keydown", function(e) {
+        if (e.key === "Enter") weightInput.blur();
+      });
+    }
+    var recalcBtn = $app.querySelector("#aiRecalc");
+    if (recalcBtn) recalcBtn.addEventListener("click", recalcFromWeight);
+
     // 确认保存：直接保存为一条记录（写入 localStorage + 刷新列表）
     var applyBtn = $app.querySelector("#aiApply");
     if (applyBtn) applyBtn.addEventListener("click", async function() {

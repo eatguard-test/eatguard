@@ -155,7 +155,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260805064153";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260805070633";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -1170,6 +1170,7 @@ function AIRecognizeResultCard(result) {
     '<div style="width:92vw;max-width:360px;margin:0 auto;background:#FFFFFF;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-height:88vh;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch">',
     '<div style="padding:20px;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 16px);background:#FFFFFF">',
     '<div class="font-semibold mb-3" style="color:var(--brand)">🤖 AI 估算结果</div>',
+    '<div style="background:#F0FDF4;border:1px solid rgba(74,124,89,0.25);border-radius:10px;padding:8px 12px;font-size:12px;color:#334155;margin-bottom:12px">💡 修改"重量"后点别处，热量会自动重算。点下方「✅ 确认保存」，记录会出现在<b>首页</b>的「📋 今日记录」里。</div>',
     warn,
     '<input type="hidden" id="aiPer100" value="' + per100Json + '" />',
     '<div style="display:flex;flex-direction:column;gap:10px">',
@@ -2012,6 +2013,7 @@ function HomePage() {
         ${proteinCard}
         <div class="flex justify-center pt-2">${ring}</div>
         ${info}
+        ${todayCard}
       `,
     });
   }
@@ -2027,6 +2029,40 @@ function HomePage() {
   const baselineHint = p.adaptive_baseline
     ? `<div class="text-xs text-slate-500 mt-2">当前自适应基线（过去 7 天均值）：${formatKcal(p.adaptive_baseline)} kcal</div>`
     : "";
+
+  // ===== 今日记录列表（保存后立即可见）=====
+  const mealsToday = state.meals
+    .filter((m) => todayStr(new Date(m.created_at)) === dateStr)
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const todayList = mealsToday.length
+    ? mealsToday
+        .map((m) => {
+          const time = new Date(m.created_at);
+          const hh = String(time.getHours()).padStart(2, "0");
+          const mm = String(time.getMinutes()).padStart(2, "0");
+          var names = (m.food_items || []).map(function(it) { return it.name; }).join("、");
+          var srcTag = m.source === "ai_estimate" ? "🤖" : (m.source === "quickrecord" ? "⚡" : "📷");
+          var mp = Number(m.meal_total_protein) || 0;
+          return `<div class="flex items-center justify-between py-2">
+            <div class="flex-1 min-w-0 pr-2">
+              <div class="text-sm font-medium">${hh}:${mm} ${srcTag} <span class="text-slate-700">${escapeHtml(names || "（无明细）")}</span></div>
+            </div>
+            <div class="text-sm font-semibold text-slate-700 shrink-0">${formatKcal(m.meal_total_calories)} kcal${mp > 0 ? " · 蛋白 " + formatGram(mp) + "g" : ""}</div>
+          </div>`;
+        })
+        .join('<div class="h-px bg-slate-200/70"></div>')
+    : `<div class="text-sm text-slate-500 py-2 text-center">今天还没有记录。点下方「＋ 快速记录」开始吧！</div>`;
+
+  const todayCard = Card({
+    className: "mt-3",
+    inner: `
+      <div class="flex items-center justify-between mb-1">
+        <div class="text-sm font-medium">📋 今日记录</div>
+        <a href="#/history" class="text-xs" style="color:var(--brand)">查看历史 →</a>
+      </div>
+      <div class="divide-y divide-slate-200/70">${todayList}</div>
+    `,
+  });
 
   const status = Card({
     className: "mt-5",
@@ -2049,15 +2085,16 @@ function HomePage() {
     activeTab: "home",
     fab: true,
     body: `
-      ${summaryCard}
-      ${snackHint}
-      ${quickRecordCard}
-      ${proteinCard}
-      <div class="flex justify-center pt-2">${ring}</div>
-      ${status}
-    `,
-  });
-}
+        ${summaryCard}
+        ${snackHint}
+        ${quickRecordCard}
+        ${proteinCard}
+        <div class="flex justify-center pt-2">${ring}</div>
+        ${status}
+        ${todayCard}
+      `,
+    });
+  }
 
 function CapturePage() {
   const p = state.profile;
@@ -3303,11 +3340,30 @@ function bindQuickRecordCustomForm() {
   function showAIResult(result, mode) {
     state.aiLastMode = mode;
     closeModal("#qrAITextOverlay");
+    // 识别结果同时自动填入下方手写表单（关闭弹窗后表单里也能看到）
+    fillQuickFormFromAI(result);
     if (qrModalDiv) {
       qrModalDiv.innerHTML = AIRecognizeResultCard(result);
       qrModalDiv.style.display = "block";
       bindAIResultCard();
     }
+  }
+
+  // 把 AI 识别结果填入"手写输入"表单字段
+  function fillQuickFormFromAI(result) {
+    if (!result) return;
+    var setName = $app.querySelector("#qfName");
+    var setAmount = $app.querySelector("#qfAmount");
+    var setCal = $app.querySelector("#qfCal");
+    var setProtein = $app.querySelector("#qfProtein");
+    var setFat = $app.querySelector("#qfFat");
+    var setCarbs = $app.querySelector("#qfCarbs");
+    if (setName && result.name) setName.value = result.name;
+    if (setAmount && result.amount) setAmount.value = result.amount;
+    if (setCal && result.calories_kcal != null) setCal.value = result.calories_kcal;
+    if (setProtein && result.protein_g != null) setProtein.value = result.protein_g;
+    if (setFat && result.fat_g != null) setFat.value = result.fat_g;
+    if (setCarbs && result.carbs_g != null) setCarbs.value = result.carbs_g;
   }
 
   // 确认卡片交互

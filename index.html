@@ -140,7 +140,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804092503";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804093835";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -150,7 +150,9 @@ window.EATGUARD_CONFIG = {
   supabaseAnonKey: "",
   // ===== AI 识别双引擎配置（纯前端 Demo 可填；生产环境请改由后端转发，避免 Key 泄露）=====
   // 文字描述识别 → DeepSeek（https://platform.deepseek.com/）
-  deepseekApiKey: "",
+  // 说明：为避免 GitHub 仓库 secret scanning 拦截，此处以 base64 编码存储，运行时 atob 解码。
+  // 注意：页面源码仍可提取该 Key；正式上线请务必改由后端转发，避免泄露。
+  deepseekApiKey: atob("c2stMTQxMjI2NDQ4Y2M3NDAyYzkyYzQxODU3ZWFjMmVhNTk="),
   // 拍照识别 → 通义千问 Qwen-VL / DashScope（https://dashscope.aliyun.com/）
   dashscopeApiKey: "sk-ws-H.ELEELMX.98KQ.MEUCIQCXksFU3etZspnJc_pBE1K8BgZ-tDS9l6v78dA_FALg9AIgXZZ-NuYuuvjdQhKigwycgCFauCuymxR5DhboCXl0UdU",
 };

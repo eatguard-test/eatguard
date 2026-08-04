@@ -140,7 +140,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804073042";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260804081217";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -153,6 +153,250 @@ window.EATGUARD_CONFIG = {
   moonshotApiKey: "",
 };
 
+</script><script>// ============================================================
+// EatGuard 内置食物营养数据库（每 100g 可食部）
+// 数据参考：《中国食物成分表（标准版）》、USDA 常见食物数据
+// 用途：离线查询 + 按份量/重量快速计算营养
+// 说明：density_g_per_ml 用于体积→重量换算（如 1 碗 = 250ml × 密度）
+// ============================================================
+(function (global) {
+  var FOOD_DB = [
+    // ---------- 主食类（15）----------
+    { name: "米饭", category: "主食", calories_kcal: 116, protein_g: 2.6, fat_g: 0.3, carbs_g: 25.9, density_g_per_ml: 0.8,
+      common_portion: { "一小碗": { weight_g: 200, desc: "标准饭碗平碗" }, "一拳头": { weight_g: 150, desc: "成人女性拳头大小" }, "一大盘": { weight_g: 400, desc: "标准菜盘满盘" } } },
+    { name: "馒头", category: "主食", calories_kcal: 223, protein_g: 7.0, fat_g: 1.1, carbs_g: 47.0, density_g_per_ml: 0.45,
+      common_portion: { "1个": { weight_g: 100, desc: "约2两，普通圆馒头" }, "半个": { weight_g: 50, desc: "半个馒头" }, "2个": { weight_g: 200, desc: "两个馒头" } } },
+    { name: "面条", category: "主食", calories_kcal: 110, protein_g: 3.9, fat_g: 0.4, carbs_g: 22.0, density_g_per_ml: 0.8,
+      common_portion: { "一小碗": { weight_g: 200, desc: "煮熟的挂面" }, "一大碗": { weight_g: 350, desc: "面馆大碗" } } },
+    { name: "粥", category: "主食", calories_kcal: 46, protein_g: 1.1, fat_g: 0.3, carbs_g: 9.9, density_g_per_ml: 0.6,
+      common_portion: { "一碗": { weight_g: 250, desc: "大米粥普通碗" }, "小碗": { weight_g: 150, desc: "小号粥碗" } } },
+    { name: "红薯", category: "主食", calories_kcal: 86, protein_g: 1.6, fat_g: 0.2, carbs_g: 20.1, density_g_per_ml: 0.7,
+      common_portion: { "中等1个": { weight_g: 200, desc: "约拳头大小，蒸熟" }, "大个": { weight_g: 300, desc: "较大红薯" } } },
+    { name: "玉米", category: "主食", calories_kcal: 112, protein_g: 4.0, fat_g: 1.2, carbs_g: 22.8, density_g_per_ml: 0.7,
+      common_portion: { "1根": { weight_g: 200, desc: "中等大小带芯" }, "半根": { weight_g: 100, desc: "半根玉米" } } },
+    { name: "燕麦", category: "主食", calories_kcal: 377, protein_g: 15.0, fat_g: 6.7, carbs_g: 61.6, density_g_per_ml: 0.5,
+      common_portion: { "30g": { weight_g: 30, desc: "约3勺干燕麦片" }, "50g": { weight_g: 50, desc: "约5勺干燕麦片" } } },
+    { name: "面包", category: "主食", calories_kcal: 313, protein_g: 8.3, fat_g: 5.1, carbs_g: 58.6, density_g_per_ml: 0.4,
+      common_portion: { "1片": { weight_g: 40, desc: "吐司切片" }, "2片": { weight_g: 80, desc: "两片吐司" } } },
+    { name: "饺子", category: "主食", calories_kcal: 240, protein_g: 8.5, fat_g: 11.0, carbs_g: 27.0, density_g_per_ml: 0.9,
+      common_portion: { "10个": { weight_g: 200, desc: "猪肉馅熟饺子" }, "5个": { weight_g: 100, desc: "半份" }, "15个": { weight_g: 300, desc: "大份" } } },
+    { name: "包子", category: "主食", calories_kcal: 227, protein_g: 8.0, fat_g: 10.0, carbs_g: 26.0, density_g_per_ml: 0.7,
+      common_portion: { "1个": { weight_g: 100, desc: "猪肉馅包子" }, "2个": { weight_g: 200, desc: "两个包子" } } },
+    { name: "馄饨", category: "主食", calories_kcal: 220, protein_g: 9.0, fat_g: 8.0, carbs_g: 28.0, density_g_per_ml: 0.9,
+      common_portion: { "1碗": { weight_g: 250, desc: "约12个带汤" }, "半碗": { weight_g: 125, desc: "约6个" } } },
+    { name: "米粉", category: "主食", calories_kcal: 97, protein_g: 1.6, fat_g: 0.2, carbs_g: 21.9, density_g_per_ml: 0.8,
+      common_portion: { "1碗": { weight_g: 250, desc: "煮熟的米粉" }, "小碗": { weight_g: 150, desc: "小份米粉" } } },
+    { name: "年糕", category: "主食", calories_kcal: 154, protein_g: 3.3, fat_g: 0.6, carbs_g: 34.7, density_g_per_ml: 1.0,
+      common_portion: { "1块": { weight_g: 100, desc: "约掌心大小" }, "半块": { weight_g: 50, desc: "半块年糕" } } },
+    { name: "土豆", category: "主食", calories_kcal: 77, protein_g: 2.0, fat_g: 0.2, carbs_g: 17.2, density_g_per_ml: 0.8,
+      common_portion: { "中等1个": { weight_g: 200, desc: "约拳头大小" }, "大个": { weight_g: 300, desc: "较大土豆" } } },
+    { name: "紫薯", category: "主食", calories_kcal: 82, protein_g: 1.3, fat_g: 0.2, carbs_g: 18.9, density_g_per_ml: 0.8,
+      common_portion: { "中等1个": { weight_g: 150, desc: "蒸熟紫薯" }, "大个": { weight_g: 250, desc: "较大紫薯" } } },
+
+    // ---------- 肉蛋类（15）----------
+    { name: "猪肉(瘦)", category: "肉蛋", calories_kcal: 143, protein_g: 20.3, fat_g: 6.2, carbs_g: 1.5, density_g_per_ml: 1.05,
+      common_portion: { "1掌心": { weight_g: 100, desc: "掌心大小厚度" }, "半掌": { weight_g: 50, desc: "半个掌心" } } },
+    { name: "猪肉(肥)", category: "肉蛋", calories_kcal: 395, protein_g: 13.2, fat_g: 37.0, carbs_g: 2.4, density_g_per_ml: 1.05,
+      common_portion: { "1块": { weight_g: 50, desc: "五花肉一块" }, "100g": { weight_g: 100, desc: "约两指宽" } } },
+    { name: "牛肉(瘦)", category: "肉蛋", calories_kcal: 106, protein_g: 20.2, fat_g: 2.3, carbs_g: 1.2, density_g_per_ml: 1.05,
+      common_portion: { "1掌心": { weight_g: 100, desc: "掌心大小厚度" }, "半掌": { weight_g: 50, desc: "半个掌心" } } },
+    { name: "羊肉(瘦)", category: "肉蛋", calories_kcal: 118, protein_g: 20.5, fat_g: 3.9, carbs_g: 0.2, density_g_per_ml: 1.05,
+      common_portion: { "1掌心": { weight_g: 100, desc: "掌心大小厚度" }, "半掌": { weight_g: 50, desc: "半个掌心" } } },
+    { name: "鸡肉", category: "肉蛋", calories_kcal: 167, protein_g: 19.3, fat_g: 9.4, carbs_g: 1.3, density_g_per_ml: 1.05,
+      common_portion: { "1块": { weight_g: 100, desc: "鸡胸肉大小" }, "半块": { weight_g: 50, desc: "半块鸡胸" } } },
+    { name: "鸭肉", category: "肉蛋", calories_kcal: 240, protein_g: 15.5, fat_g: 19.7, carbs_g: 0.2, density_g_per_ml: 1.05,
+      common_portion: { "1块": { weight_g: 100, desc: "鸭腿肉一块" }, "半块": { weight_g: 50, desc: "半块鸭肉" } } },
+    { name: "鸡蛋", category: "肉蛋", calories_kcal: 144, protein_g: 13.3, fat_g: 8.8, carbs_g: 2.8, density_g_per_ml: 1.0,
+      common_portion: { "1个": { weight_g: 60, desc: "中等大小" }, "2个": { weight_g: 120, desc: "两个鸡蛋" }, "半个": { weight_g: 30, desc: "半个鸡蛋" } } },
+    { name: "鸭蛋", category: "肉蛋", calories_kcal: 180, protein_g: 12.6, fat_g: 13.0, carbs_g: 3.1, density_g_per_ml: 1.0,
+      common_portion: { "1个": { weight_g: 70, desc: "中等大小" }, "2个": { weight_g: 140, desc: "两个鸭蛋" } } },
+    { name: "火腿肠", category: "肉蛋", calories_kcal: 212, protein_g: 14.0, fat_g: 10.4, carbs_g: 15.6, density_g_per_ml: 1.0,
+      common_portion: { "1根": { weight_g: 50, desc: "普通火腿肠" }, "半根": { weight_g: 25, desc: "半根火腿肠" } } },
+    { name: "培根", category: "肉蛋", calories_kcal: 181, protein_g: 22.3, fat_g: 9.0, carbs_g: 2.6, density_g_per_ml: 0.9,
+      common_portion: { "2片": { weight_g: 40, desc: "每片约20g" }, "4片": { weight_g: 80, desc: "四片培根" } } },
+    { name: "鸡腿", category: "肉蛋", calories_kcal: 181, protein_g: 16.0, fat_g: 13.0, carbs_g: 0, density_g_per_ml: 1.05,
+      common_portion: { "1个": { weight_g: 150, desc: "带骨鸡腿" }, "去骨1个": { weight_g: 100, desc: "去骨鸡腿肉" } } },
+    { name: "鸡翅", category: "肉蛋", calories_kcal: 194, protein_g: 17.4, fat_g: 11.8, carbs_g: 4.6, density_g_per_ml: 1.0,
+      common_portion: { "2个": { weight_g: 90, desc: "每个约45g" }, "4个": { weight_g: 180, desc: "四个鸡翅" } } },
+    { name: "排骨", category: "肉蛋", calories_kcal: 278, protein_g: 16.7, fat_g: 23.1, carbs_g: 0.7, density_g_per_ml: 1.05,
+      common_portion: { "1块": { weight_g: 100, desc: "约3-4小段猪小排" }, "2块": { weight_g: 200, desc: "两份排骨" } } },
+    { name: "猪肝", category: "肉蛋", calories_kcal: 129, protein_g: 19.3, fat_g: 3.5, carbs_g: 5.0, density_g_per_ml: 1.05,
+      common_portion: { "1片": { weight_g: 50, desc: "约掌心厚片" }, "100g": { weight_g: 100, desc: "两片猪肝" } } },
+    { name: "鱼丸", category: "肉蛋", calories_kcal: 107, protein_g: 11.1, fat_g: 2.5, carbs_g: 7.6, density_g_per_ml: 1.0,
+      common_portion: { "5个": { weight_g: 100, desc: "每球约20g" }, "10个": { weight_g: 200, desc: "十个鱼丸" } } },
+
+    // ---------- 水产类（10）----------
+    { name: "草鱼", category: "水产", calories_kcal: 113, protein_g: 16.6, fat_g: 5.2, carbs_g: 0, density_g_per_ml: 1.0,
+      common_portion: { "1块": { weight_g: 100, desc: "约巴掌大鱼肉" }, "半块": { weight_g: 50, desc: "半块鱼肉" } } },
+    { name: "鲫鱼", category: "水产", calories_kcal: 108, protein_g: 17.1, fat_g: 2.7, carbs_g: 3.8, density_g_per_ml: 1.0,
+      common_portion: { "1条": { weight_g: 250, desc: "整条约半斤（带骨）" }, "半条": { weight_g: 125, desc: "半条鲫鱼" } } },
+    { name: "虾", category: "水产", calories_kcal: 101, protein_g: 18.2, fat_g: 1.4, carbs_g: 3.9, density_g_per_ml: 1.0,
+      common_portion: { "8只": { weight_g: 100, desc: "中等基围虾" }, "4只": { weight_g: 50, desc: "四只虾" }, "16只": { weight_g: 200, desc: "大份虾" } } },
+    { name: "蟹", category: "水产", calories_kcal: 103, protein_g: 17.5, fat_g: 2.6, carbs_g: 2.3, density_g_per_ml: 1.0,
+      common_portion: { "1只": { weight_g: 150, desc: "中等河蟹" }, "半只": { weight_g: 75, desc: "半只螃蟹" } } },
+    { name: "带鱼", category: "水产", calories_kcal: 127, protein_g: 17.7, fat_g: 4.9, carbs_g: 3.1, density_g_per_ml: 0.9,
+      common_portion: { "1段": { weight_g: 100, desc: "约10cm鱼段" }, "2段": { weight_g: 200, desc: "两段带鱼" } } },
+    { name: "黄花鱼", category: "水产", calories_kcal: 97, protein_g: 17.7, fat_g: 2.5, carbs_g: 0.8, density_g_per_ml: 0.9,
+      common_portion: { "1条": { weight_g: 150, desc: "中等整条（带骨）" }, "半条": { weight_g: 75, desc: "半条黄花鱼" } } },
+    { name: "鱿鱼", category: "水产", calories_kcal: 75, protein_g: 17.0, fat_g: 0.8, carbs_g: 0, density_g_per_ml: 0.9,
+      common_portion: { "1条": { weight_g: 150, desc: "中等鱿鱼" }, "半条": { weight_g: 75, desc: "半条鱿鱼" } } },
+    { name: "蛤蜊", category: "水产", calories_kcal: 62, protein_g: 10.1, fat_g: 1.1, carbs_g: 2.8, density_g_per_ml: 1.0,
+      common_portion: { "15个": { weight_g: 100, desc: "带壳称重" }, "30个": { weight_g: 200, desc: "约两把蛤蜊" } } },
+    { name: "海带", category: "水产", calories_kcal: 13, protein_g: 1.2, fat_g: 0.1, carbs_g: 2.1, density_g_per_ml: 0.7,
+      common_portion: { "1小盘": { weight_g: 100, desc: "凉拌海带丝" }, "半盘": { weight_g: 50, desc: "半盘海带" } } },
+    { name: "紫菜", category: "水产", calories_kcal: 207, protein_g: 26.7, fat_g: 1.1, carbs_g: 22.5, density_g_per_ml: 0.3,
+      common_portion: { "5g": { weight_g: 5, desc: "约1/4张干紫菜" }, "10g": { weight_g: 10, desc: "约半张干紫菜" } } },
+
+    // ---------- 蔬菜类（15）----------
+    { name: "白菜", category: "蔬菜", calories_kcal: 17, protein_g: 1.5, fat_g: 0.1, carbs_g: 3.2, density_g_per_ml: 0.6,
+      common_portion: { "1盘": { weight_g: 200, desc: "约1碗炒白菜" }, "半盘": { weight_g: 100, desc: "半盘白菜" } } },
+    { name: "菠菜", category: "蔬菜", calories_kcal: 24, protein_g: 2.6, fat_g: 0.3, carbs_g: 4.5, density_g_per_ml: 0.6,
+      common_portion: { "1盘": { weight_g: 200, desc: "清炒菠菜一盘" }, "半盘": { weight_g: 100, desc: "半盘菠菜" } } },
+    { name: "西红柿", category: "蔬菜", calories_kcal: 15, protein_g: 0.9, fat_g: 0.2, carbs_g: 3.3, density_g_per_ml: 0.9,
+      common_portion: { "1个": { weight_g: 150, desc: "中等大小" }, "2个": { weight_g: 300, desc: "两个西红柿" } } },
+    { name: "黄瓜", category: "蔬菜", calories_kcal: 15, protein_g: 0.8, fat_g: 0.2, carbs_g: 2.9, density_g_per_ml: 0.8,
+      common_portion: { "1根": { weight_g: 150, desc: "中等黄瓜" }, "半根": { weight_g: 75, desc: "半根黄瓜" } } },
+    { name: "胡萝卜", category: "蔬菜", calories_kcal: 32, protein_g: 1.0, fat_g: 0.2, carbs_g: 7.7, density_g_per_ml: 0.8,
+      common_portion: { "1根": { weight_g: 150, desc: "中等胡萝卜" }, "半根": { weight_g: 75, desc: "半根胡萝卜" } } },
+    { name: "西兰花", category: "蔬菜", calories_kcal: 27, protein_g: 3.5, fat_g: 0.6, carbs_g: 3.7, density_g_per_ml: 0.5,
+      common_portion: { "1盘": { weight_g: 200, desc: "焯水西兰花一盘" }, "半盘": { weight_g: 100, desc: "半盘西兰花" } } },
+    { name: "茄子", category: "蔬菜", calories_kcal: 21, protein_g: 1.1, fat_g: 0.2, carbs_g: 4.9, density_g_per_ml: 0.6,
+      common_portion: { "1根": { weight_g: 200, desc: "中等长茄子" }, "半根": { weight_g: 100, desc: "半根茄子" } } },
+    { name: "青椒", category: "蔬菜", calories_kcal: 22, protein_g: 1.4, fat_g: 0.3, carbs_g: 5.4, density_g_per_ml: 0.6,
+      common_portion: { "1个": { weight_g: 100, desc: "中等青椒" }, "2个": { weight_g: 200, desc: "两个青椒" } } },
+    { name: "洋葱", category: "蔬菜", calories_kcal: 39, protein_g: 1.1, fat_g: 0.2, carbs_g: 9.0, density_g_per_ml: 0.7,
+      common_portion: { "半个": { weight_g: 100, desc: "半个洋葱" }, "1个": { weight_g: 200, desc: "整个洋葱" } } },
+    { name: "芹菜", category: "蔬菜", calories_kcal: 17, protein_g: 1.2, fat_g: 0.2, carbs_g: 3.3, density_g_per_ml: 0.6,
+      common_portion: { "1盘": { weight_g: 200, desc: "炒芹菜一盘" }, "半盘": { weight_g: 100, desc: "半盘芹菜" } } },
+    { name: "南瓜", category: "蔬菜", calories_kcal: 22, protein_g: 0.7, fat_g: 0.1, carbs_g: 5.3, density_g_per_ml: 0.7,
+      common_portion: { "1盘": { weight_g: 200, desc: "蒸南瓜一盘" }, "半盘": { weight_g: 100, desc: "半盘南瓜" } } },
+    { name: "冬瓜", category: "蔬菜", calories_kcal: 11, protein_g: 0.4, fat_g: 0.2, carbs_g: 2.6, density_g_per_ml: 0.7,
+      common_portion: { "1盘": { weight_g: 200, desc: "冬瓜汤一碗" }, "半盘": { weight_g: 100, desc: "半盘冬瓜" } } },
+    { name: "蘑菇", category: "蔬菜", calories_kcal: 20, protein_g: 2.7, fat_g: 0.1, carbs_g: 4.1, density_g_per_ml: 0.5,
+      common_portion: { "1盘": { weight_g: 150, desc: "约10朵鲜蘑菇" }, "半盘": { weight_g: 75, desc: "半盘蘑菇" } } },
+    { name: "豆芽", category: "蔬菜", calories_kcal: 18, protein_g: 2.1, fat_g: 0.1, carbs_g: 2.9, density_g_per_ml: 0.6,
+      common_portion: { "1盘": { weight_g: 200, desc: "绿豆芽一盘" }, "半盘": { weight_g: 100, desc: "半盘豆芽" } } },
+    { name: "生菜", category: "蔬菜", calories_kcal: 13, protein_g: 1.3, fat_g: 0.3, carbs_g: 2.0, density_g_per_ml: 0.4,
+      common_portion: { "1盘": { weight_g: 150, desc: "生菜沙拉一份" }, "半盘": { weight_g: 75, desc: "半盘生菜" } } },
+
+    // ---------- 豆制品（5）----------
+    { name: "豆腐", category: "豆制品", calories_kcal: 98, protein_g: 12.2, fat_g: 4.8, carbs_g: 2.0, density_g_per_ml: 1.05,
+      common_portion: { "半块": { weight_g: 100, desc: "北豆腐半块" }, "1块": { weight_g: 200, desc: "盒装豆腐1/2盒" }, "1盒": { weight_g: 400, desc: "整盒内酯豆腐" } } },
+    { name: "豆浆", category: "豆制品", calories_kcal: 31, protein_g: 3.0, fat_g: 1.6, carbs_g: 1.2, density_g_per_ml: 1.0,
+      common_portion: { "1杯": { weight_g: 250, desc: "250ml豆浆" }, "半杯": { weight_g: 125, desc: "125ml豆浆" }, "大杯": { weight_g: 400, desc: "400ml大杯" } } },
+    { name: "豆腐干", category: "豆制品", calories_kcal: 142, protein_g: 16.2, fat_g: 8.0, carbs_g: 4.6, density_g_per_ml: 1.1,
+      common_portion: { "2片": { weight_g: 50, desc: "两片豆腐干" }, "4片": { weight_g: 100, desc: "四片豆腐干" } } },
+    { name: "腐竹", category: "豆制品", calories_kcal: 461, protein_g: 44.6, fat_g: 21.7, carbs_g: 22.3, density_g_per_ml: 0.4,
+      common_portion: { "1把": { weight_g: 30, desc: "干腐竹泡发前" }, "60g": { weight_g: 60, desc: "两把干腐竹" } } },
+    { name: "千张", category: "豆制品", calories_kcal: 262, protein_g: 24.5, fat_g: 16.0, carbs_g: 5.5, density_g_per_ml: 1.1,
+      common_portion: { "半张": { weight_g: 50, desc: "半张千张" }, "1张": { weight_g: 100, desc: "整张千张约1盘" } } },
+
+    // ---------- 水果类（10）----------
+    { name: "苹果", category: "水果", calories_kcal: 52, protein_g: 0.2, fat_g: 0.2, carbs_g: 13.5, density_g_per_ml: 0.85,
+      common_portion: { "1个": { weight_g: 200, desc: "中等大小" }, "半个": { weight_g: 100, desc: "半个苹果" } } },
+    { name: "香蕉", category: "水果", calories_kcal: 89, protein_g: 1.4, fat_g: 0.2, carbs_g: 22.0, density_g_per_ml: 0.9,
+      common_portion: { "1根": { weight_g: 120, desc: "中等带皮香蕉" }, "2根": { weight_g: 240, desc: "两根香蕉" } } },
+    { name: "橙子", category: "水果", calories_kcal: 48, protein_g: 0.8, fat_g: 0.2, carbs_g: 11.1, density_g_per_ml: 0.85,
+      common_portion: { "1个": { weight_g: 200, desc: "中等大小" }, "2个": { weight_g: 400, desc: "两个橙子" } } },
+    { name: "葡萄", category: "水果", calories_kcal: 43, protein_g: 0.5, fat_g: 0.2, carbs_g: 10.3, density_g_per_ml: 0.8,
+      common_portion: { "1串": { weight_g: 150, desc: "约20粒" }, "半串": { weight_g: 75, desc: "约10粒" } } },
+    { name: "西瓜", category: "水果", calories_kcal: 26, protein_g: 0.6, fat_g: 0.1, carbs_g: 6.8, density_g_per_ml: 0.9,
+      common_portion: { "1片": { weight_g: 150, desc: "三角形一片" }, "半片": { weight_g: 75, desc: "半片西瓜" } } },
+    { name: "草莓", category: "水果", calories_kcal: 32, protein_g: 1.0, fat_g: 0.2, carbs_g: 7.1, density_g_per_ml: 0.7,
+      common_portion: { "8个": { weight_g: 100, desc: "中等草莓" }, "4个": { weight_g: 50, desc: "四个草莓" } } },
+    { name: "梨", category: "水果", calories_kcal: 44, protein_g: 0.4, fat_g: 0.2, carbs_g: 13.3, density_g_per_ml: 0.85,
+      common_portion: { "1个": { weight_g: 200, desc: "中等大小" }, "半个": { weight_g: 100, desc: "半个梨" } } },
+    { name: "桃子", category: "水果", calories_kcal: 42, protein_g: 0.9, fat_g: 0.1, carbs_g: 12.2, density_g_per_ml: 0.85,
+      common_portion: { "1个": { weight_g: 200, desc: "中等大小" }, "半个": { weight_g: 100, desc: "半个桃子" } } },
+    { name: "芒果", category: "水果", calories_kcal: 35, protein_g: 0.6, fat_g: 0.2, carbs_g: 8.3, density_g_per_ml: 0.9,
+      common_portion: { "1个": { weight_g: 150, desc: "中等去核果肉" }, "半个": { weight_g: 75, desc: "半个芒果" } } },
+    { name: "猕猴桃", category: "水果", calories_kcal: 56, protein_g: 0.8, fat_g: 0.6, carbs_g: 14.5, density_g_per_ml: 0.8,
+      common_portion: { "1个": { weight_g: 80, desc: "中等大小" }, "2个": { weight_g: 160, desc: "两个猕猴桃" } } },
+
+    // ---------- 奶类（5）----------
+    { name: "牛奶", category: "奶类", calories_kcal: 54, protein_g: 3.0, fat_g: 3.2, carbs_g: 3.4, density_g_per_ml: 1.03,
+      common_portion: { "1杯": { weight_g: 250, desc: "250ml全脂牛奶" }, "半杯": { weight_g: 125, desc: "125ml牛奶" }, "1盒": { weight_g: 200, desc: "200ml利乐包" } } },
+    { name: "酸奶", category: "奶类", calories_kcal: 72, protein_g: 2.5, fat_g: 2.7, carbs_g: 9.3, density_g_per_ml: 1.05,
+      common_portion: { "1盒": { weight_g: 200, desc: "全脂原味酸奶" }, "半盒": { weight_g: 100, desc: "半盒酸奶" } } },
+    { name: "奶酪", category: "奶类", calories_kcal: 328, protein_g: 25.7, fat_g: 23.5, carbs_g: 3.5, density_g_per_ml: 1.2,
+      common_portion: { "1片": { weight_g: 20, desc: "芝士片" }, "2片": { weight_g: 40, desc: "两片芝士" } } },
+    { name: "奶粉", category: "奶类", calories_kcal: 478, protein_g: 20.1, fat_g: 21.2, carbs_g: 51.7, density_g_per_ml: 0.5,
+      common_portion: { "2勺": { weight_g: 25, desc: "每勺约12.5g" }, "50g": { weight_g: 50, desc: "约4勺奶粉" } } },
+    { name: "奶油", category: "奶类", calories_kcal: 879, protein_g: 0.7, fat_g: 97.0, carbs_g: 0.9, density_g_per_ml: 0.95,
+      common_portion: { "1勺": { weight_g: 15, desc: "一小勺淡奶油" }, "30g": { weight_g: 30, desc: "两勺奶油" } } },
+
+    // ---------- 坚果油脂（5）----------
+    { name: "花生", category: "坚果油脂", calories_kcal: 601, protein_g: 21.7, fat_g: 48.0, carbs_g: 17.3, density_g_per_ml: 0.6,
+      common_portion: { "1把": { weight_g: 30, desc: "约20粒花生米" }, "半把": { weight_g: 15, desc: "约10粒" } } },
+    { name: "核桃", category: "坚果油脂", calories_kcal: 646, protein_g: 14.9, fat_g: 58.8, carbs_g: 19.1, density_g_per_ml: 0.6,
+      common_portion: { "2个": { weight_g: 20, desc: "约2个核桃仁" }, "4个": { weight_g: 40, desc: "四个核桃仁" } } },
+    { name: "瓜子", category: "坚果油脂", calories_kcal: 606, protein_g: 22.6, fat_g: 52.8, carbs_g: 12.5, density_g_per_ml: 0.55,
+      common_portion: { "1把": { weight_g: 25, desc: "炒葵花籽一小把" }, "半把": { weight_g: 12, desc: "半把瓜子" } } },
+    { name: "食用油", category: "坚果油脂", calories_kcal: 899, protein_g: 0, fat_g: 99.9, carbs_g: 0, density_g_per_ml: 0.92,
+      common_portion: { "1勺": { weight_g: 10, desc: "中式汤匙" }, "半勺": { weight_g: 5, desc: "半汤匙油" } } },
+    { name: "芝麻酱", category: "坚果油脂", calories_kcal: 618, protein_g: 19.2, fat_g: 52.7, carbs_g: 22.7, density_g_per_ml: 1.2,
+      common_portion: { "1勺": { weight_g: 15, desc: "调芝麻酱一勺" }, "2勺": { weight_g: 30, desc: "两勺芝麻酱" } } },
+  ];
+
+  var FOOD_CATEGORY_ORDER = ["主食", "肉蛋", "水产", "蔬菜", "豆制品", "水果", "奶类", "坚果油脂"];
+
+  // 按名称检索（支持精确/包含，返回匹配数组）
+  function findFoodByName(query) {
+    var q = String(query || "").trim().toLowerCase();
+    if (!q) return [];
+    var exact = [];
+    var fuzzy = [];
+    for (var i = 0; i < FOOD_DB.length; i++) {
+      var f = FOOD_DB[i];
+      var n = f.name.toLowerCase();
+      if (n === q) { exact.push(f); }
+      else if (n.indexOf(q) >= 0) { fuzzy.push(f); }
+      else if (q.indexOf(n) >= 0 && n.length >= 2) { fuzzy.push(f); }
+    }
+    return exact.concat(fuzzy);
+  }
+
+  // 按类别获取
+  function foodsByCategory(cat) {
+    return FOOD_DB.filter(function (f) { return f.category === cat; });
+  }
+
+  // 按克数计算营养（每100g → 任意重量）
+  function nutritionFromGrams(food, grams) {
+    var g = Number(grams) || 0;
+    var k = g / 100;
+    return {
+      calories_kcal: Math.round(food.calories_kcal * k),
+      protein_g: Math.round(food.protein_g * k * 10) / 10,
+      fat_g: Math.round(food.fat_g * k * 10) / 10,
+      carbs_g: Math.round(food.carbs_g * k * 10) / 10,
+      weight_g: Math.round(g),
+    };
+  }
+
+  // 按常见份量计算营养
+  function nutritionFromPortion(food, portionKey) {
+    var p = food.common_portion && food.common_portion[portionKey];
+    if (!p) return null;
+    var n = nutritionFromGrams(food, p.weight_g);
+    n.portion = portionKey;
+    n.portion_desc = p.desc;
+    return n;
+  }
+
+  // 体积(ml) → 重量(g)：毫升 × 密度
+  function mlToGrams(food, ml) {
+    return Math.round((Number(ml) || 0) * (food.density_g_per_ml || 1));
+  }
+
+  global.FOOD_DB = FOOD_DB;
+  global.FOOD_CATEGORY_ORDER = FOOD_CATEGORY_ORDER;
+  global.findFoodByName = findFoodByName;
+  global.foodsByCategory = foodsByCategory;
+  global.nutritionFromGrams = nutritionFromGrams;
+  global.nutritionFromPortion = nutritionFromPortion;
+  global.mlToGrams = mlToGrams;
+})(typeof window !== "undefined" ? window : globalThis);
 </script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>// EatGuard（静态 PWA 原型）
 // 目标：移动端优先 + 7 天观察期 + 自适应热量基线 + 餐前温和提醒
 //
@@ -662,10 +906,32 @@ function parseWeightToGrams(amountStr) {
 }
 
 // AI 估算：根据名称关键词 + 重量 → {calories, protein}，无匹配返回 null
+// 优先使用内置 FOOD_DB（80 种食物营养数据库），回退到 FOOD_DENSITY
 function estimateFoodAI(name, amountStr) {
   if (!name) return null;
   var n = String(name).trim();
-  // 最长关键词优先匹配
+  var grams = parseWeightToGrams(amountStr);
+  if (grams <= 0) return null; // 没重量无法估算
+
+  // 1) 优先：FOOD_DB 内置数据库（每100g 完整营养）
+  if (typeof window !== "undefined" && window.FOOD_DB && window.findFoodByName) {
+    var hits = window.findFoodByName(n);
+    if (hits && hits.length) {
+      var f = hits[0];
+      var k = grams / 100;
+      return {
+        calories: Math.round(f.calories_kcal * k),
+        protein: Math.round(f.protein_g * k * 10) / 10,
+        fat: Math.round(f.fat_g * k * 10) / 10,
+        carbs: Math.round(f.carbs_g * k * 10) / 10,
+        matched: f.name,
+        grams: grams,
+        fromDb: true,
+      };
+    }
+  }
+
+  // 2) 回退：FOOD_DENSITY 密度库（仅热量/蛋白质）
   var best = null;
   for (var i = 0; i < FOOD_DENSITY.length; i++) {
     var item = FOOD_DENSITY[i];
@@ -679,11 +945,9 @@ function estimateFoodAI(name, amountStr) {
     }
   }
   if (!best) return null;
-  var grams = parseWeightToGrams(amountStr);
-  if (grams <= 0) return null; // 没重量无法估算
   var calories = Math.round(grams * best.item.calPerG);
   var protein = Math.round((grams * best.item.proteinPer100) / 100);
-  return { calories: calories, protein: protein, matched: best.item.keywords[0], grams: grams };
+  return { calories: calories, protein: protein, matched: best.item.keywords[0], grams: grams, fromDb: false };
 }
 
 // ===== Kimi (Moonshot) AI 智能估算（拍照 / 文字）=====
@@ -2761,7 +3025,10 @@ function bindQuickRecordCustomForm() {
       return;
     }
     aiEstimateBox.style.display = "block";
-    aiText.textContent = "识别为「" + est.matched + "」约 " + est.grams + "g → 热量约 " + est.calories + " kcal · 蛋白质约 " + est.protein + "g";
+    var extra = (est.fat != null || est.carbs != null)
+      ? " · 脂肪约 " + (est.fat != null ? est.fat : "?") + "g · 碳水约 " + (est.carbs != null ? est.carbs : "?") + "g"
+      : "";
+    aiText.textContent = "识别为「" + est.matched + "」约 " + est.grams + "g → 热量约 " + est.calories + " kcal · 蛋白质约 " + est.protein + "g" + extra;
     aiFill.style.display = "block";
     aiLast = est;
   }
@@ -2779,6 +3046,10 @@ function bindQuickRecordCustomForm() {
     var proInput = $app.querySelector("#qfProtein");
     if (calInput) calInput.value = aiLast.calories;
     if (proInput) proInput.value = aiLast.protein;
+    var fatInput = $app.querySelector("#qfFat");
+    var carbsInput = $app.querySelector("#qfCarbs");
+    if (aiLast.fat != null && fatInput) fatInput.value = aiLast.fat;
+    if (aiLast.carbs != null && carbsInput) carbsInput.value = aiLast.carbs;
     setToast("已填入 AI 估算结果，可手动微调");
   });
 

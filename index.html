@@ -155,7 +155,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260805213512";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260805214705";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -1916,41 +1916,55 @@ function HomePage() {
   const remainCal = Math.max(0, displayTarget - actual);
   const remainPro = Math.max(0, proteinTarget - actualProtein);
 
-  // 环形颜色：绿色 → 黄色 → 红色（按摄入占比）
-  function ringColorFor(pct) {
-    if (pct >= 100) return "#EF4444";
-    if (pct >= 80) return "#F59E0B";
-    return "var(--brand)";
+  // 进度颜色（深色系）：绿 → 黄 → 红（按摄入占比）；轨道用对应浅色
+  function deepColorFor(pct, kind) {
+    if (pct >= 100) return "#b91c1c";
+    if (pct >= 80) return "#b45309";
+    return kind === "cal" ? "#2d6a4f" : "#e76f51";
   }
   const calPct = displayTarget > 0 ? (actual / displayTarget) * 100 : 0;
   const proPct = proteinTarget > 0 ? (actualProtein / proteinTarget) * 100 : 0;
-  const calColor = ringColorFor(calPct);
-  const proColor = ringColorFor(proPct);
+  const calColor = deepColorFor(calPct, "cal");   // 外圈进度：深绿系
+  const proColor = deepColorFor(proPct, "pro");   // 内圈进度：深橘系
+  const calTrack = "#cfe3d3";                     // 外圈剩余：浅绿
+  const proTrack = "#f8d7cc";                     // 内圈剩余：浅橘
 
-  // 双环形图：外圈(热量) + 内圈(蛋白质) 同心圆嵌套，中间显示剩余
-  function miniRing(percent, color, size, stroke) {
+  // 双环形图：外圈(热量) + 内圈(蛋白质) 同心圆紧贴，中间显示剩余
+  // progress=进度深色 / track=剩余浅色 / dot=端点小圆点(同进度色)
+  function miniRing(percent, progress, track, size, stroke) {
     const r = (size - stroke) / 2;
     const c = 2 * Math.PI * r;
     const pp = clamp(percent, 0, 120);
     const dash = (c * pp) / 100;
+    const cx = size / 2, cy = size / 2;
+    // 进度末端小圆点位置（从顶部 -90° 顺时针）
+    const ang = -Math.PI / 2 + (c > 0 ? (dash / c) * 2 * Math.PI : 0);
+    const dx = cx + r * Math.cos(ang);
+    const dy = cy + r * Math.sin(ang);
+    const dotR = stroke / 2 + 2;
+    const dot = dash > 0
+      ? `<circle cx="${dx}" cy="${dy}" r="${dotR}" fill="${progress}"></circle>`
+      : "";
     return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block">
-      <circle cx="${size/2}" cy="${size/2}" r="${r}" stroke="rgba(15,23,42,0.08)" stroke-width="${stroke}" fill="none"></circle>
-      <circle cx="${size/2}" cy="${size/2}" r="${r}" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round" fill="none"
-        stroke-dasharray="${dash} ${c - dash}" transform="rotate(-90 ${size/2} ${size/2})"></circle>
+      <circle cx="${cx}" cy="${cy}" r="${r}" stroke="${track}" stroke-width="${stroke}" fill="none"></circle>
+      <circle cx="${cx}" cy="${cy}" r="${r}" stroke="${progress}" stroke-width="${stroke}" stroke-linecap="round" fill="none"
+        stroke-dasharray="${dash} ${c - dash}" transform="rotate(-90 ${cx} ${cy})"></circle>
+      ${dot}
     </svg>`;
   }
-  // 同心圆：外圈 200px(热量) + 内圈 130px(蛋白质)，中间空白放文字
+  // 同心圆紧贴：外圈 200px(stroke 18, 内边缘 82) + 内圈 164px(stroke 18, 外边缘 82)
+  // 两环粗细一致，中间留 64px 直径空白放文字
   const doubleRing = `
     <div style="display:flex;align-items:center;justify-content:center;padding:8px 0">
       <div style="position:relative;width:200px;height:200px">
-        ${miniRing(calPct, calColor, 200, 18)}
+        ${miniRing(calPct, calColor, calTrack, 200, 18)}
         <div style="position:absolute;top:0;left:0;display:grid;place-items:center;width:200px;height:200px">
-          ${miniRing(proPct, proColor, 128, 14)}
+          ${miniRing(proPct, proColor, proTrack, 164, 18)}
         </div>
         <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 8px">
           <div class="text-xs text-slate-500">今日还能摄入</div>
-          <div class="text-sm font-semibold mt-1" style="color:var(--brand)">热量 ${formatKcal(remainCal)} kcal</div>
-          <div class="text-sm font-semibold" style="color:var(--amber)">蛋白质 ${formatGram(remainPro)} g</div>
+          <div class="text-sm font-semibold mt-1" style="color:${calColor}">热量: ${formatKcal(remainCal)} kcal</div>
+          <div class="text-sm font-semibold" style="color:${proColor}">蛋白质: ${formatGram(remainPro)} g</div>
         </div>
       </div>
     </div>
@@ -2005,8 +2019,8 @@ function HomePage() {
           </div>
           ${doubleRing}
           <div class="text-xs text-slate-400 mt-1 text-center">
-            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--brand);margin-right:2px"></span>绿色圈=热量
-            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);margin-left:10px;margin-right:2px"></span>橘色圈=蛋白质
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${calColor};margin-right:2px"></span>绿色圈=热量
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${proColor};margin-left:10px;margin-right:2px"></span>橘色圈=蛋白质
           </div>
         `,
       })}

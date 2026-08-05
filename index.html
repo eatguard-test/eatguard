@@ -155,7 +155,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260805215234";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260805222752";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -1671,6 +1671,21 @@ function setToast(msg, ms = 1400) {
   }, ms);
 }
 
+// 轻量 toast：不触发 render()，避免重建页面清空输入框
+// 用于需要保持表单状态的异步流程（AI 确认输入、保存等）
+function lightToast(msg, ms) {
+  var old = document.getElementById("lightToast");
+  if (old && old.parentNode) old.parentNode.removeChild(old);
+  var d = document.createElement("div");
+  d.id = "lightToast";
+  d.textContent = msg;
+  d.style.cssText = "position:fixed;left:50%;bottom:100px;transform:translateX(-50%);z-index:99999;background:rgba(15,23,42,0.85);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;pointer-events:none;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.15)";
+  document.body.appendChild(d);
+  setTimeout(function() {
+    if (d.parentNode) d.parentNode.removeChild(d);
+  }, ms || 1500);
+}
+
 function parseRoute() {
   const raw = location.hash.replace(/^#\/?/, "");
   const [path, qs] = raw.split("?");
@@ -2081,7 +2096,7 @@ function TextRecordPage() {
       ${Card({
         inner: `
           <div class="text-sm font-medium mb-3" style="color:var(--brand)">🤖 AI 估算结果</div>
-          <div class="flex flex-col gap-4">
+          <div class="grid grid-cols-2 gap-3">
             ${nutField("trCal", "热量", "kcal")}
             ${nutField("trProtein", "蛋白质", "g")}
             ${nutField("trFat", "脂肪", "g")}
@@ -2117,7 +2132,7 @@ function bindTextRecordPage() {
   if (cancelBtn) cancelBtn.addEventListener("click", function() { navigate("home"); });
   if (saveBtn) saveBtn.addEventListener("click", async function() {
     var name = ($app.querySelector("#trName")?.value || "").trim();
-    if (!name) { setToast("请先填写食物名称"); return; }
+    if (!name) { lightToast("请先填写食物名称"); return; }
     var weight = parseFloat(($app.querySelector("#trWeight")?.value || "").replace(/[^\d.]/g, ""));
     // 营养字段为可编辑输入框，读取 value（"--" 视为 0）
     function readNum(id) {
@@ -2131,7 +2146,7 @@ function bindTextRecordPage() {
     var fat = readNum("#trFat");
     var carbs = readNum("#trCarbs");
     if (!cal && !protein && !fat && !carbs) {
-      setToast("请先点「确认输入」获取营养数据，或手动填写");
+      lightToast("请先点「确认输入」获取营养数据，或手动填写");
       return;
     }
     var amount = ($app.querySelector("#trAmount")?.value || "").trim();
@@ -2882,11 +2897,11 @@ const actions = {
     var name = ($app.querySelector("#trName")?.value || "").trim();
     var weight = ($app.querySelector("#trWeight")?.value || "").trim();
     var amount = ($app.querySelector("#trAmount")?.value || "").trim();
-    if (!name) { setToast("请先填写食物名称"); return; }
+    if (!name) { lightToast("请先填写食物名称"); return; }
     var text = [name, amount, weight ? weight + "g" : ""].filter(Boolean).join("，");
     var errorBox = $app.querySelector("#trError");
     if (errorBox) errorBox.style.display = "none";
-    setToast("AI正在估算...");
+    lightToast("AI正在估算...");
     try {
       var result = await callAIAnalyze({ text: text });
       if (!result || typeof result !== "object") throw { code: "BAD_JSON" };
@@ -2903,19 +2918,17 @@ const actions = {
         fat = round1(fat * k);
         carbs = round1(carbs * k);
       }
-      // 填充到可编辑输入框（value 而非 textContent）
+      // 填充到可编辑输入框（value 而非 textContent）；不触发 render，避免数值被清空
       var setv = function(id, v) { var el = $app.querySelector(id); if (el) el.value = v; };
       setv("#trCal", cal);
       setv("#trProtein", protein);
       setv("#trFat", fat);
       setv("#trCarbs", carbs);
       console.log("✅ 文字确认输入:", name, "→", cal, "kcal");
-      setToast("已填充，请核对后保存");
+      lightToast("已填充，请核对后保存");
     } catch (err) {
       console.error("文字估算失败:", err);
-      var et = $app.querySelector("#trErrorText");
-      if (et) et.textContent = "AI 估算失败，请重试或手动填写";
-      if (errorBox) errorBox.style.display = "block";
+      lightToast("识别失败，请手动填写");
     }
   },
 
@@ -3278,12 +3291,12 @@ async function saveRecord(data) {
     await reloadData();
     console.log("保存成功：" + name + " " + cal + "kcal");
     state.draft = null;
-    setToast("已保存：" + name + " " + cal + "kcal");
+    lightToast("已保存：" + name + " " + cal + "kcal");
     setTimeout(function() { navigate("history"); render(); }, 1000);
     return true;
   } catch (err) {
     console.error("saveRecord 失败:", err);
-    setToast("保存失败，请重试");
+    lightToast("保存失败，请重试");
     return false;
   }
 }

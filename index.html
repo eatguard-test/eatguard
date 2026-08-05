@@ -311,7 +311,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260805232234";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260806052935";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -1229,7 +1229,15 @@ async function callAIProxy(endpoint, body) {
   } catch (e) {
     if (timer) clearTimeout(timer);
     var abortErr = new Error("请求超时或网络异常（60s）");
-    abortErr.code = e && e.name === "AbortError" ? "TIMEOUT" : "NETWORK";
+    // 关键诊断：HTTPS 页面（github.io）请求 http://localhost 会被浏览器以"混合内容"直接阻止
+    var pageIsHttps = typeof location !== "undefined" && location.protocol === "https:";
+    var targetIsHttpLocal = base.indexOf("http://localhost") === 0 || base.indexOf("http://127.0.0.1") === 0;
+    if (pageIsHttps && targetIsHttpLocal) {
+      abortErr.code = "MIXED_CONTENT";
+      abortErr.message = "HTTPS 页面禁止访问本地 HTTP 后端（混合内容被浏览器阻止）";
+    } else {
+      abortErr.code = e && e.name === "AbortError" ? "TIMEOUT" : "NETWORK";
+    }
     throw abortErr;
   }
   if (timer) clearTimeout(timer);
@@ -3084,7 +3092,9 @@ const actions = {
       console.error("文字估算失败:", err);
       // 区分错误类型，给出更具体的提示
       var code = err && err.code ? err.code : "";
-      if (code === "NETWORK" || code === "TIMEOUT") {
+      if (code === "MIXED_CONTENT") {
+        lightToast("请用 http://localhost:3000 打开本页面（HTTPS 页面不能访问本地后端）");
+      } else if (code === "NETWORK" || code === "TIMEOUT") {
         lightToast("网络错误，请检查后端是否运行");
       } else {
         lightToast("AI服务繁忙，请手动填写");

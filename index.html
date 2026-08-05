@@ -311,7 +311,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260806070329";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260806070926";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -3062,12 +3062,33 @@ const actions = {
     navigate("textrecord");
   },
 
-  // 文字描述页：确认输入 → 调后端 /api/ai-text → 显示营养
+  // 文字描述页：确认输入 → 本地食物库优先（0 消耗）→ 未命中才调后端 AI
   async trConfirmInput() {
     var name = ($app.querySelector("#trName")?.value || "").trim();
     var weight = ($app.querySelector("#trWeight")?.value || "").trim();
     var amount = ($app.querySelector("#trAmount")?.value || "").trim();
     if (!name) { lightToast("请先填写食物名称"); return; }
+
+    var setv = function(id, v) { var el = $app.querySelector(id); if (el) el.value = v; };
+    var w = parseFloat(weight);
+
+    // ===== 第一步：本地食物库匹配（完全免费，不消耗 DeepSeek/通义千问 API 额度）=====
+    if (w > 0 && typeof findFoodByName === "function") {
+      var localMatches = findFoodByName(name);
+      if (localMatches && localMatches.length) {
+        var food = localMatches[0];
+        var nut = nutritionFromGrams(food, w);
+        setv("#trCal", nut.calories_kcal);
+        setv("#trProtein", nut.protein_g);
+        setv("#trFat", nut.fat_g);
+        setv("#trCarbs", nut.carbs_g);
+        console.log("✅ 本地食物库匹配:", name, "→", nut.calories_kcal, "kcal（未调用AI）");
+        lightToast("✓ 本地食物库匹配（不消耗AI额度）");
+        return;
+      }
+    }
+
+    // ===== 第二步：本地未命中 → 调后端 AI（消耗 API 额度）=====
     var text = [name, amount, weight ? weight + "g" : ""].filter(Boolean).join("，");
     var errorBox = $app.querySelector("#trError");
     if (errorBox) errorBox.style.display = "none";
@@ -3076,7 +3097,6 @@ const actions = {
       var result = await callAIAnalyze({ text: text });
       if (!result || typeof result !== "object") throw { code: "BAD_JSON" };
       // 若用户填了重量但 AI 返回的是默认份量，按重量比例换算
-      var w = parseFloat(weight);
       var cal = Number(result.calories_kcal) || 0;
       var protein = Number(result.protein_g) || 0;
       var fat = Number(result.fat_g) || 0;
@@ -3089,7 +3109,6 @@ const actions = {
         carbs = round1(carbs * k);
       }
       // 填充到可编辑输入框（value 而非 textContent）；不触发 render，避免数值被清空
-      var setv = function(id, v) { var el = $app.querySelector(id); if (el) el.value = v; };
       setv("#trCal", cal);
       setv("#trProtein", protein);
       setv("#trFat", fat);

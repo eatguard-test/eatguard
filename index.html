@@ -311,7 +311,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260806064946";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260806070329";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -1205,10 +1205,15 @@ function estimateFoodAI(name, amountStr) {
 // ===== AI 智能估算（后端转发：文字→DeepSeek / 图片→通义千问 Qwen-VL）=====
 // 安全：前端不含任何 API Key，全部由 backend/ 服务转发
 
-// 后端地址：config.aiBackendUrl > localStorage > 默认 localhost:3000
+// 后端地址：config.aiBackendUrl > 当前页面(HTTP托管模式，含手机局域网访问) > localStorage > 默认
 function getBackendUrl() {
   var cfg = (window.EATGUARD_CONFIG && window.EATGUARD_CONFIG.aiBackendUrl) || "";
   if (cfg) return cfg.replace(/\/+$/, "");
+  // 页面由后端托管（HTTP 同源模式）：手机通过局域网 IP 访问时，AI 请求必须发往同一地址
+  // （否则手机上的 localhost 指向手机自己，连不上电脑后端）
+  if (typeof location !== "undefined" && location.protocol === "http:") {
+    return location.origin;
+  }
   var saved = lsGet("eatguard_backend_url", "");
   if (saved) return saved.replace(/\/+$/, "");
   return "http://localhost:3000";

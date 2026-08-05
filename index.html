@@ -155,7 +155,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260805214705";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260805215234";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -2041,8 +2041,18 @@ function HomePage() {
   });
 }
 
-// 文字描述页：名称/数量/重量 → 确认输入(AI) → 显示营养 → 保存
+// 文字描述页：名称/数量/重量 → 确认输入(AI) → 显示营养(可编辑) → 保存
 function TextRecordPage() {
+  // 四个营养字段：始终可见的可编辑输入框，初始为 "--"，确认输入后填充
+  function nutField(id, label, unit) {
+    return `
+      <label class="block">
+        <div class="text-sm text-slate-600 mb-2">${escapeHtml(label)}（${escapeHtml(unit)}）</div>
+        <input id="${id}" type="number" inputmode="decimal" min="0" step="0.1" value="--" placeholder="--"
+          class="w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 outline-none focus:ring-2 focus:ring-brand/30" />
+      </label>
+    `;
+  }
   var body = `
     <div class="mt-2">
       ${Card({
@@ -2063,34 +2073,19 @@ function TextRecordPage() {
             </label>
           </div>
           <div class="mt-4">${Button({ label: "确认输入", onClick: "trConfirmInput" })}</div>
+          <div class="text-xs text-slate-400 mt-2">填写名称、数量、重量后点「确认输入」，AI 会填充下方营养数值</div>
         `,
       })}
     </div>
-    <div id="trResult" style="display:none" class="mt-4">
+    <div class="mt-4">
       ${Card({
         inner: `
           <div class="text-sm font-medium mb-3" style="color:var(--brand)">🤖 AI 估算结果</div>
-          <div class="grid grid-cols-2 gap-3">
-            <div class="rounded-xl p-3" style="background:#f8fafc">
-              <div class="text-xs text-slate-500">热量</div>
-              <div id="trCal" class="text-lg font-semibold text-slate-800">--</div>
-              <div class="text-xs text-slate-400">kcal</div>
-            </div>
-            <div class="rounded-xl p-3" style="background:#f8fafc">
-              <div class="text-xs text-slate-500">蛋白质</div>
-              <div id="trProtein" class="text-lg font-semibold text-slate-800">--</div>
-              <div class="text-xs text-slate-400">g</div>
-            </div>
-            <div class="rounded-xl p-3" style="background:#f8fafc">
-              <div class="text-xs text-slate-500">脂肪</div>
-              <div id="trFat" class="text-lg font-semibold text-slate-800">--</div>
-              <div class="text-xs text-slate-400">g</div>
-            </div>
-            <div class="rounded-xl p-3" style="background:#f8fafc">
-              <div class="text-xs text-slate-500">碳水</div>
-              <div id="trCarbs" class="text-lg font-semibold text-slate-800">--</div>
-              <div class="text-xs text-slate-400">g</div>
-            </div>
+          <div class="flex flex-col gap-4">
+            ${nutField("trCal", "热量", "kcal")}
+            ${nutField("trProtein", "蛋白质", "g")}
+            ${nutField("trFat", "脂肪", "g")}
+            ${nutField("trCarbs", "碳水", "g")}
           </div>
           <div class="text-xs text-slate-400 mt-3">AI估算仅供参考，请核对后保存</div>
         `,
@@ -2124,12 +2119,19 @@ function bindTextRecordPage() {
     var name = ($app.querySelector("#trName")?.value || "").trim();
     if (!name) { setToast("请先填写食物名称"); return; }
     var weight = parseFloat(($app.querySelector("#trWeight")?.value || "").replace(/[^\d.]/g, ""));
-    var cal = parseFloat(($app.querySelector("#trCal")?.textContent || "").replace(/[^\d.]/g, ""));
-    var protein = parseFloat(($app.querySelector("#trProtein")?.textContent || "").replace(/[^\d.]/g, ""));
-    var fat = parseFloat(($app.querySelector("#trFat")?.textContent || "").replace(/[^\d.]/g, ""));
-    var carbs = parseFloat(($app.querySelector("#trCarbs")?.textContent || "").replace(/[^\d.]/g, ""));
+    // 营养字段为可编辑输入框，读取 value（"--" 视为 0）
+    function readNum(id) {
+      var s = ($app.querySelector(id)?.value || "").trim();
+      if (!s || s === "--") return 0;
+      var n = parseFloat(s.replace(/[^\d.]/g, ""));
+      return isNaN(n) ? 0 : n;
+    }
+    var cal = readNum("#trCal");
+    var protein = readNum("#trProtein");
+    var fat = readNum("#trFat");
+    var carbs = readNum("#trCarbs");
     if (!cal && !protein && !fat && !carbs) {
-      setToast("请先点「确认输入」获取营养数据");
+      setToast("请先点「确认输入」获取营养数据，或手动填写");
       return;
     }
     var amount = ($app.querySelector("#trAmount")?.value || "").trim();
@@ -2882,9 +2884,7 @@ const actions = {
     var amount = ($app.querySelector("#trAmount")?.value || "").trim();
     if (!name) { setToast("请先填写食物名称"); return; }
     var text = [name, amount, weight ? weight + "g" : ""].filter(Boolean).join("，");
-    var resultBox = $app.querySelector("#trResult");
     var errorBox = $app.querySelector("#trError");
-    if (resultBox) resultBox.style.display = "none";
     if (errorBox) errorBox.style.display = "none";
     setToast("AI正在估算...");
     try {
@@ -2903,13 +2903,14 @@ const actions = {
         fat = round1(fat * k);
         carbs = round1(carbs * k);
       }
-      var setv = function(id, v) { var el = $app.querySelector(id); if (el) el.textContent = v; };
+      // 填充到可编辑输入框（value 而非 textContent）
+      var setv = function(id, v) { var el = $app.querySelector(id); if (el) el.value = v; };
       setv("#trCal", cal);
       setv("#trProtein", protein);
       setv("#trFat", fat);
       setv("#trCarbs", carbs);
-      if (resultBox) resultBox.style.display = "block";
       console.log("✅ 文字确认输入:", name, "→", cal, "kcal");
+      setToast("已填充，请核对后保存");
     } catch (err) {
       console.error("文字估算失败:", err);
       var et = $app.querySelector("#trErrorText");

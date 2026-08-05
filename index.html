@@ -155,7 +155,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260805073237";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260805081639";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -2212,39 +2212,42 @@ function QuickRecordConfirmModal(food, isCustom) {
 function QuickRecordCustomForm() {
   return [
     '<div class="action-sheet-overlay" id="qrCustomOverlay" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;padding:0;padding-bottom:env(safe-area-inset-bottom,20px)">',
-    '<div style="width:90vw;margin:0 auto;background:#FFFFFF;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.25);max-height:84vh;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:env(safe-area-inset-bottom,30px)">',
-    '<div style="padding:20px;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 20px);background:#FFFFFF">',
-    '<div class="font-semibold mb-4">✏️ 手写输入</div>',
-    // AI 智能估算按钮组
-    '<div style="display:flex;gap:8px;margin-bottom:14px">',
+    '<div style="width:90vw;margin:0 auto;background:#FFFFFF;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.25);max-height:88vh;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:env(safe-area-inset-bottom,30px)">',
+    // ===== 区域1：AI 辅助输入（顶部）=====
+    '<div style="padding:20px 20px 16px 20px;background:#FFFFFF">',
+    '<div class="font-semibold mb-3">✏️ 手写输入</div>',
+    '<div class="text-xs text-slate-500 mb-3">可用 AI 帮你识别，或直接手动填写下方表单</div>',
+    '<div style="display:flex;gap:8px;margin-bottom:10px">',
     '<button id="qfAIPhoto" class="tap" style="flex:1;padding:12px 8px;border-radius:12px;border:1.5px solid var(--brand);background:var(--brand);color:#fff;font-size:14px;font-weight:500;cursor:pointer;-webkit-tap-highlight-color:transparent">📷 拍照识别</button>',
     '<button id="qfAIText" class="tap" style="flex:1;padding:12px 8px;border-radius:12px;border:1.5px solid var(--brand);background:#fff;color:var(--brand);font-size:14px;font-weight:500;cursor:pointer;-webkit-tap-highlight-color:transparent">📝 文字描述</button>',
     '</div>',
+    // AI 状态提示区
+    '<div id="qfAIStatus" style="display:none;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:4px"></div>',
     // 隐藏拍照 input
     '<input type="file" id="qfAIPhotoInput" accept="image/*" capture="environment" style="position:absolute;left:-9999px;top:-9999px;opacity:0;pointer-events:none;width:1px;height:1px" />',
-    '<div style="display:flex;flex-direction:column;gap:12px">',
-    '<div><div class="text-xs text-slate-500 mb-1">食物名称</div>',
-    '<input id="qfName" type="text" placeholder="如：鸡蛋 / 米饭 / 苹果" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
-    '<div><div class="text-xs text-slate-500 mb-1">重量</div>',
-    '<input id="qfAmount" type="text" placeholder="重量：如 200g / 250ml / 1个（约150g）" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
-    '<div id="qfAIEstimate" style="display:none;background:#F0FDF4;border:1px solid rgba(74,124,89,0.25);border-radius:10px;padding:10px 12px">',
-    '<div class="text-xs font-semibold" style="color:var(--brand)">🤖 快速估算</div>',
-    '<div id="qfAIText" class="text-sm mt-1" style="color:#334155"></div>',
-    '<button id="qfAIFill" class="tap" style="display:none;margin-top:8px;width:100%;padding:8px;border:none;background:var(--brand);color:#fff;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer">使用估算结果</button>',
     '</div>',
-    '<div><div class="text-xs text-slate-500 mb-1">热量（kcal）<span style="color:#999">（选填，可让 AI 自动估算）</span></div>',
-    '<input id="qfCal" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="例如：150" min="1" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
-    '<div><div class="text-xs text-slate-500 mb-1">蛋白质（g）<span style="color:#999">（选填，可让 AI 自动估算）</span></div>',
-    '<input id="qfProtein" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="例如：8" min="0" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
-    '<div><div class="text-xs text-slate-500 mb-1">脂肪（g）<span style="color:#999">（选填）</span></div>',
-    '<input id="qfFat" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="例如：5" min="0" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
-    '<div><div class="text-xs text-slate-500 mb-1">碳水化合物（g）<span style="color:#999">（选填）</span></div>',
-    '<input id="qfCarbs" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="例如：40" min="0" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
-    '<div class="text-xs text-slate-400 mt-1" style="padding-top:2px">输入名称和重量后自动估算；或点上方按钮用 AI 拍照/文字识别 ✨</div>',
+    // ===== 区域2：食物信息表单（中部）=====
+    '<div style="padding:0 20px;background:#FFFFFF">',
+    '<div style="border-top:1px solid rgba(15,23,42,0.06);padding-top:14px;display:flex;flex-direction:column;gap:12px">',
+    '<div><div class="text-xs text-slate-500 mb-1">食物名称 <span style="color:#c97a86">*</span></div>',
+    '<input id="qfName" type="text" placeholder="如：鸡蛋 / 米饭 / 苹果" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
+    '<div><div class="text-xs text-slate-500 mb-1">份量（可选）</div>',
+    '<input id="qfAmount" type="text" placeholder="如：1个 / 1碗 / 250ml" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
+    '<div><div class="text-xs text-slate-500 mb-1">重量（g）</div>',
+    '<input id="qfWeight" type="number" inputmode="decimal" min="1" placeholder="如：150" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
+    '<div><div class="text-xs text-slate-500 mb-1">热量（kcal）</div>',
+    '<input id="qfCal" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="如：150" min="1" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
+    '<div><div class="text-xs text-slate-500 mb-1">蛋白质（g）</div>',
+    '<input id="qfProtein" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="如：8" min="0" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
+    '<div><div class="text-xs text-slate-500 mb-1">脂肪（g）</div>',
+    '<input id="qfFat" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="如：5" min="0" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
+    '<div><div class="text-xs text-slate-500 mb-1">碳水化合物（g）</div>',
+    '<input id="qfCarbs" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="如：40" min="0" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:15px;box-sizing:border-box;background:#fff" /></div>',
     '</div></div>',
-    '<div style="display:flex;border-top:1px solid rgba(15,23,42,0.06)">',
+    // ===== 区域3：操作按钮（底部）=====
+    '<div style="display:flex;border-top:1px solid rgba(15,23,42,0.06);margin-top:14px">',
     '<button id="qfCancel" class="tap" style="flex:1;padding:16px;border:none;background:transparent;color:#999;font-size:15px;cursor:pointer;-webkit-tap-highlight-color:transparent">取消</button>',
-    '<button id="qfSave" class="tap" style="flex:1;padding:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:500;cursor:pointer;-webkit-tap-highlight-color:transparent">保存并记录</button>',
+    '<button id="qfSave" class="tap" style="flex:2;padding:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent">✅ 确认保存</button>',
     '</div></div></div>',
   ].join("");
 }
@@ -3210,63 +3213,51 @@ function bindQuickRecordCustomForm() {
     }
   });
 
+  // ===== 取消：关闭弹窗，不保存 =====
   var cancelBtn = $app.querySelector("#qfCancel");
   if (cancelBtn) cancelBtn.addEventListener("click", function() {
     var modalDiv = $app.querySelector("#qrModal");
     if (modalDiv) modalDiv.style.display = "none";
   });
 
-  // ===== AI 自动估算：监听名称 + 重量输入 =====
-  var aiEstimateBox = $app.querySelector("#qfAIEstimate");
-  var aiText = $app.querySelector("#qfAIText");
-  var aiFill = $app.querySelector("#qfAIFill");
-  var aiLast = null;
-
-  function updateAIEstimate() {
-    var name = ($app.querySelector("#qfName")?.value || "").trim();
-    var amount = ($app.querySelector("#qfAmount")?.value || "").trim();
-    if (!aiEstimateBox || !aiText || !aiFill) return;
-    if (!name) {
-      aiEstimateBox.style.display = "none";
-      aiFill.style.display = "none";
-      aiLast = null;
-      return;
+  // ===== AI 状态提示（区域1 顶部）=====
+  var aiStatusDiv = $app.querySelector("#qfAIStatus");
+  function setAIStatus(type, msg) {
+    if (!aiStatusDiv) return;
+    if (type === "loading") {
+      aiStatusDiv.style.display = "block";
+      aiStatusDiv.style.background = "#EFF6FF";
+      aiStatusDiv.style.border = "1px solid #93C5FD";
+      aiStatusDiv.style.color = "#1D4ED8";
+      aiStatusDiv.innerHTML = '<div style="display:flex;align-items:center;gap:8px"><div style="width:16px;height:16px;border:2px solid #93C5FD;border-top-color:#1D4ED8;border-radius:50%;animation:aiSpin 0.8s linear infinite"></div><span>AI正在识别...</span></div>';
+    } else if (type === "success") {
+      aiStatusDiv.style.display = "block";
+      aiStatusDiv.style.background = "#F0FDF4";
+      aiStatusDiv.style.border = "1px solid rgba(74,124,89,0.25)";
+      aiStatusDiv.style.color = "#166534";
+      aiStatusDiv.textContent = "✅ " + msg;
+    } else if (type === "error") {
+      aiStatusDiv.style.display = "block";
+      aiStatusDiv.style.background = "#FEF2F2";
+      aiStatusDiv.style.border = "1px solid #FCA5A5";
+      aiStatusDiv.style.color = "#B91C1C";
+      aiStatusDiv.textContent = "❌ " + msg;
+    } else {
+      aiStatusDiv.style.display = "none";
+      aiStatusDiv.innerHTML = "";
     }
-    var est = estimateFoodAI(name, amount);
-    if (!est) {
-      aiEstimateBox.style.display = "none";
-      aiFill.style.display = "none";
-      aiLast = null;
-      return;
-    }
-    aiEstimateBox.style.display = "block";
-    var extra = (est.fat != null || est.carbs != null)
-      ? " · 脂肪约 " + (est.fat != null ? est.fat : "?") + "g · 碳水约 " + (est.carbs != null ? est.carbs : "?") + "g"
-      : "";
-    aiText.textContent = "识别为「" + est.matched + "」约 " + est.grams + "g → 热量约 " + est.calories + " kcal · 蛋白质约 " + est.protein + "g" + extra;
-    aiFill.style.display = "block";
-    aiLast = est;
   }
 
-  var nameInput = $app.querySelector("#qfName");
-  var amountInput = $app.querySelector("#qfAmount");
-  if (nameInput) nameInput.addEventListener("input", updateAIEstimate);
-  if (nameInput) nameInput.addEventListener("change", updateAIEstimate);
-  if (amountInput) amountInput.addEventListener("input", updateAIEstimate);
-  if (amountInput) amountInput.addEventListener("change", updateAIEstimate);
-
-  if (aiFill) aiFill.addEventListener("click", function() {
-    if (!aiLast) return;
-    var calInput = $app.querySelector("#qfCal");
-    var proInput = $app.querySelector("#qfProtein");
-    if (calInput) calInput.value = aiLast.calories;
-    if (proInput) proInput.value = aiLast.protein;
-    var fatInput = $app.querySelector("#qfFat");
-    var carbsInput = $app.querySelector("#qfCarbs");
-    if (aiLast.fat != null && fatInput) fatInput.value = aiLast.fat;
-    if (aiLast.carbs != null && carbsInput) carbsInput.value = aiLast.carbs;
-    setToast("已填入 AI 估算结果，可手动微调");
-  });
+  // ===== 确认保存按钮：表单有名称数据时显示 =====
+  var saveBtn = $app.querySelector("#qfSave");
+  function showSaveButton() {
+    if (!saveBtn) return;
+    var name = ($app.querySelector("#qfName")?.value || "").trim();
+    saveBtn.style.display = name ? "block" : "none";
+  }
+  var nameInputEl = $app.querySelector("#qfName");
+  if (nameInputEl) nameInputEl.addEventListener("input", showSaveButton);
+  showSaveButton(); // 初始状态
 
   // ===== AI 智能估算（拍照 / 文字）=====
   var qrModalDiv = $app.querySelector("#qrModal");
@@ -3300,17 +3291,13 @@ function bindQuickRecordCustomForm() {
     else setToast(isPhoto ? "图片识别失败，请重试" : "网络不稳定，请检查连接后重试");
   }
 
-  // 识别成功后弹出可编辑确认卡片
+  // 识别成功后：填入下方表单 + 绿色提示（不再弹结果卡片）
   function showAIResult(result, mode) {
     state.aiLastMode = mode;
     closeModal("#qrAITextOverlay");
-    // 识别结果同时自动填入下方手写表单（关闭弹窗后表单里也能看到）
     fillQuickFormFromAI(result);
-    if (qrModalDiv) {
-      qrModalDiv.innerHTML = AIRecognizeResultCard(result);
-      qrModalDiv.style.display = "block";
-      bindAIResultCard();
-    }
+    setAIStatus("success", "已填入表单，请核对后保存");
+    showSaveButton();
   }
 
   // 把 AI 识别结果填入"手写输入"表单字段
@@ -3318,12 +3305,14 @@ function bindQuickRecordCustomForm() {
     if (!result) return;
     var setName = $app.querySelector("#qfName");
     var setAmount = $app.querySelector("#qfAmount");
+    var setWeight = $app.querySelector("#qfWeight");
     var setCal = $app.querySelector("#qfCal");
     var setProtein = $app.querySelector("#qfProtein");
     var setFat = $app.querySelector("#qfFat");
     var setCarbs = $app.querySelector("#qfCarbs");
     if (setName && result.name) setName.value = result.name;
     if (setAmount && result.amount) setAmount.value = result.amount;
+    if (setWeight && result.weight_g != null) setWeight.value = result.weight_g;
     if (setCal && result.calories_kcal != null) setCal.value = result.calories_kcal;
     if (setProtein && result.protein_g != null) setProtein.value = result.protein_g;
     if (setFat && result.fat_g != null) setFat.value = result.fat_g;
@@ -3423,29 +3412,15 @@ function bindQuickRecordCustomForm() {
       var file = aiPhotoInput.files && aiPhotoInput.files[0];
       if (!file) return;
       console.log("📸 文件已选择:", file.name, file.type, file.size);
+      setAIStatus("loading", "");
       setToast("图片压缩中...");
       compressImage(file, function(dataUrl) {
         if (!dataUrl) {
           console.error("❌ 图片压缩失败（回调 null）");
-          setToast("图片处理失败，请重试");
+          setAIStatus("error", "图片处理失败，请重试");
           return;
         }
         console.log("✅ 压缩完成，base64长度:", dataUrl.length);
-        // 弹出 loading 弹窗并执行识别
-        if (!qrModalDiv) {
-          console.error("❌ #qrModal 不存在，无法继续");
-          setToast("界面异常，请返回重试");
-          return;
-        }
-        qrModalDiv.innerHTML = AITextInputModal("photo");
-        qrModalDiv.style.display = "block";
-        bindAITextModal("photo", dataUrl);
-        showAILoading(true);
-        var goBtn = $app.querySelector("#aiTextGo");
-        if (goBtn) goBtn.style.display = "none";
-        var cancelBtn = $app.querySelector("#aiTextCancel");
-        if (cancelBtn) cancelBtn.style.display = "none";
-        setToast("正在识别食物...");
         console.log("🚀 正在发送图片识别请求 → /api/ai-image (base64 " + (dataUrl.length / 1024).toFixed(0) + "KB)");
         runAIAnalysis({ imageBase64: dataUrl });
       });
@@ -3479,6 +3454,7 @@ function bindQuickRecordCustomForm() {
       var text = ($app.querySelector("#aiTextInput")?.value || "").trim();
       if (mode === "text" && !text) { setToast("请先输入食物描述"); return; }
       showAILoading(true);
+      setAIStatus("loading", "");
       runAIAnalysis({ imageBase64: imageBase64 || null, text: mode === "text" ? text : null });
     });
   }
@@ -3492,7 +3468,9 @@ function bindQuickRecordCustomForm() {
       showAIResult(result, opts.imageBase64 ? "photo" : "text");
     } catch (err) {
       console.error("AI analysis failed:", err);
+      closeModal("#qrAITextOverlay");
       showAILoading(false);
+      setAIStatus("error", "识别失败，请重试或手动填写");
       aiErrorToast(err, !!opts.imageBase64);
     }
   }
@@ -3520,12 +3498,6 @@ function bindQuickRecordCustomForm() {
       await ensureTodayTarget(state.userId, state.profile, dateStr);
       await reloadData();
       console.log("✅ reloadData 后 state.meals 条数:", state.meals.length, "| 今日:", state.meals.filter(function(m) { return todayStr(new Date(m.created_at)) === todayStr(); }).length, "条");
-      // 关闭快速记录弹窗 + 跳回首页，让用户立即看到新记录
-      var modalDiv = $app.querySelector("#qrModal");
-      if (modalDiv) { modalDiv.style.display = "none"; modalDiv.innerHTML = ""; }
-      // 强制重绘首页：直接 render 而非仅改 hash（若已在 home，hashchange 不触发）
-      navigate("home");
-      render();
       return true;
     } catch (err) {
       console.error("QuickRecord save failed:", err);
@@ -3534,28 +3506,31 @@ function bindQuickRecordCustomForm() {
     }
   }
 
-  var saveBtn = $app.querySelector("#qfSave");
+  // ===== 确认保存（区域3 底部）=====
   if (saveBtn) saveBtn.addEventListener("click", async function() {
     var name = ($app.querySelector("#qfName")?.value || "").trim();
-    var calRaw = ($app.querySelector("#qfCal")?.value || "").trim();
-    var proRaw = ($app.querySelector("#qfProtein")?.value || "").trim();
-    var fatRaw = ($app.querySelector("#qfFat")?.value || "").trim();
-    var carbsRaw = ($app.querySelector("#qfCarbs")?.value || "").trim();
+    if (!name) { setToast("请先填写食物名称"); return; }
+    function num(id) { var n = parseFloat(($app.querySelector(id)?.value || "").replace(/[^\d.]/g, "")); return isNaN(n) ? 0 : n; }
     var amount = ($app.querySelector("#qfAmount")?.value || "").trim();
-    if (!name) { setToast("请输入食物名称"); return; }
-    // 热量、蛋白质等均为选填：没填则按 0 处理，仍允许保存
-    function toNum(s) { var n = parseFloat(s); return isNaN(n) ? 0 : n; }
-    var cal = toNum(calRaw);
-    var protein = toNum(proRaw);
-    var fat = toNum(fatRaw);
-    var carbs = toNum(carbsRaw);
-    var isAI = !!state.aiEstimateUsed;
-    state.aiEstimateUsed = false; // 用完即重置
-
+    var weight = num("#qfWeight");
+    var cal = num("#qfCal");
+    var protein = num("#qfProtein");
+    var fat = num("#qfFat");
+    var carbs = num("#qfCarbs");
+    if (!amount && weight > 0) amount = weight + "g";
+    var isAI = !!state.aiLastMode;
+    state.aiLastMode = null; // 用完即重置
     var modalDiv = $app.querySelector("#qrModal");
-    if (modalDiv) modalDiv.style.display = "none";
+    if (modalDiv) { modalDiv.style.display = "none"; modalDiv.innerHTML = ""; }
     var ok = await saveQuickRecordMeal({ name: name, amount: amount, cal: cal, protein: protein, fat: fat, carbs: carbs, source: isAI ? "ai_estimate" : "quickrecord" });
-    if (ok) setToast("已记录：" + name);
+    if (ok) {
+      console.log("保存成功：" + name + " " + cal + "kcal");
+      setToast("已保存：" + name + " " + cal + "kcal");
+      // 1 秒后自动跳转到历史页面，让用户看到记录
+      setTimeout(function() { navigate("history"); render(); }, 1000);
+    } else {
+      setToast("保存失败，请重试");
+    }
   });
 }
 function bindRecognizeSlider() {

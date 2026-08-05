@@ -155,7 +155,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260805081639";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260805202821";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -775,11 +775,23 @@ function sumItemsProtein(items) {
 function calcMealTotal(items, eatenPercentage) {
   const raw = sumItemsCalories(items);
   const factor = clamp(Number(eatenPercentage) / 100, 0.1, 1);
-  return raw * factor;
+  return round(raw * factor);
 }
 
 function calcMealProtein(items, eatenPercentage) {
   const raw = sumItemsProtein(items);
+  const factor = clamp(Number(eatenPercentage) / 100, 0.1, 1);
+  return round(raw * factor);
+}
+
+function calcMealFat(items, eatenPercentage) {
+  const raw = (items || []).reduce((acc, it) => acc + (Number(it.fat) || 0), 0);
+  const factor = clamp(Number(eatenPercentage) / 100, 0.1, 1);
+  return round(raw * factor);
+}
+
+function calcMealCarbs(items, eatenPercentage) {
+  const raw = (items || []).reduce((acc, it) => acc + (Number(it.carbs) || 0), 0);
   const factor = clamp(Number(eatenPercentage) / 100, 0.1, 1);
   return round(raw * factor);
 }
@@ -1883,7 +1895,6 @@ function HomePage() {
   const dateStr = todayStr();
   const isB = isBaseline(p, dateStr);
   const dayIdx = baselineDayIndex(p, dateStr);
-  const remainingDays = remainingBaselineDays(p, dateStr);
 
   const todayTarget = state.targets.find((t) => t.date === dateStr);
   const actual = todayTarget?.actual_calories ?? 0;
@@ -1892,183 +1903,223 @@ function HomePage() {
     todayTarget?.target_calories ??
     (p.adaptive_baseline != null ? Math.max(genderFloor(p.gender), round(Number(p.adaptive_baseline) * goalCoefficient(p.goal))) : 0);
   const displayTarget = isB ? estimatedTarget : adaptiveTarget;
-  const remaining = displayTarget - actual;
-  const tone = intakeProgressTone(actual, displayTarget);
-  const colors = toneToColors(tone);
-  const percent = displayTarget > 0 ? (actual / displayTarget) * 100 : 0;
 
-  const subtitle = isB
-    ? `📊 基线收集中（剩 ${remainingDays} 天），目标为估算值`
-    : "📊 基于您的真实饮食习惯计算";
-
-  const summaryCard = Card({
-    className: "pt-5 pb-4",
-    inner: `
-      <div class="flex items-start justify-between gap-4">
-        <div>
-          <div class="text-xs font-medium tracking-[0.02em] text-slate-500">今日目标热量</div>
-          <div class="text-[30px] leading-none font-semibold tracking-tight text-slate-900 mt-2">${formatKcal(displayTarget)}<span class="text-base font-medium text-slate-500 ml-1">kcal</span></div>
-        </div>
-        <div class="pill px-3 py-1 text-xs font-medium shrink-0" style="background:${colors.chipBg}; color:${colors.chipText};">
-          ${tone === "green" ? "安全区间" : tone === "amber" ? "接近上限" : "已超目标"}
-        </div>
-      </div>
-      <div class="mt-4 rounded-2xl bg-slate-50/80 border border-slate-200/70 px-4 py-3">
-        <div class="text-sm text-slate-700">已摄入：<span class="font-semibold text-slate-900">${formatKcal(actual)} kcal</span> | 还可吃：<span class="font-semibold text-slate-900">${formatKcal(remaining)} kcal</span></div>
-      </div>
-      <div class="mt-3 inline-flex items-center rounded-full bg-brand/5 px-3 py-1 text-xs text-slate-500">${subtitle}</div>
-    `,
-  });
-
-  const snackHint =
-    remaining > 0
-      ? `
-        <div class="mt-3 rounded-2xl bg-white/65 px-4 py-3 text-sm text-slate-600 text-center leading-relaxed border border-white/70">
-          今天还能吃约 <span class="font-semibold text-slate-800">${formatKcal(remaining)} kcal</span> 的正餐/零食/饮料 🍵
-        </div>
-      `
-      : "";
-
-  // \u5feb\u901f\u8bb0\u5f55\u5165\u53e3
-  const quickRecordCard = `
-    <div class="mt-3 card p-4 cursor-pointer tap" id="btnQuickRecord" onclick="actions.goQuickRecord()">
-      <div class="flex items-center justify-between">
-        <div>
-          <div class="font-semibold text-sm">\u26a1 \u5feb\u901f\u8bb0\u5f55\uff08\u4e0d\u7528\u62cd\u7167\uff09</div>
-          <div class="text-xs text-slate-500 mt-1">\u76f4\u63a5\u9009\u62e9\u996e\u54c1\u3001\u6c34\u679c\u3001\u96f6\u98df\u7b49</div>
-        </div>
-        <div class="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center text-lg leading-none" style="flex-shrink:0">\uff0b</div>
-      </div>
-    </div>
-  `;
-
-  // \u86cb\u767d\u8d28\u7edf\u8ba1
+  // 蛋白质目标
   const proteinTarget = calcDailyProteinTarget(p);
   const actualProtein = Math.round(
-    (() => {
-      const mealsToday = state.meals.filter((m) => todayStr(new Date(m.created_at)) === dateStr);
-      return mealsToday.reduce((acc, m) => acc + (Number(m.meal_total_protein) || 0), 0);
-    })()
+    state.meals
+      .filter((m) => todayStr(new Date(m.created_at)) === dateStr)
+      .reduce((acc, m) => acc + (Number(m.meal_total_protein) || 0), 0)
   );
-  const pTone = proteinProgressTone(actualProtein, proteinTarget);
-  const pColors = toneToColors(pTone);
-  const proteinPct = proteinTarget > 0 ? Math.min((actualProtein / proteinTarget) * 100, 100) : 0;
-  const proteinRemaining = Math.max(0, proteinTarget - actualProtein);
 
-  const proteinAgeNote = (p.age >= 50) ? `<div class="text-xs text-amber mt-1">已根据年龄（≥50岁）调整蛋白质目标</div>` : "";
-  const proteinHintText = (() => {
-    if (proteinPct >= 80) return "蛋白质摄入充足，继续保持 💪";
-    if (proteinPct >= 50) return `今天还可以补充约 ${formatGram(proteinRemaining)}g 蛋白质，建议晚餐加一个鸡蛋或一杯牛奶`;
-    return "今天蛋白质摄入偏少，长期不足可能影响代谢，建议多吃鱼、肉、蛋、豆";
-  })();
+  // 剩余可摄入
+  const remainCal = Math.max(0, displayTarget - actual);
+  const remainPro = Math.max(0, proteinTarget - actualProtein);
 
-  const proteinCard = `
-    <div class="mt-3 card p-4">
-      <div class="flex items-center justify-between">
-        <div class="text-sm font-medium">🧬 蛋白质：已摄入 ${formatGram(actualProtein)}g / 目标 ${proteinTarget}g</div>
-        <div class="pill px-2 py-0.5 text-xs" style="background:${pColors.chipBg}; color:${pColors.chipText};">
-          ${pTone === "green" ? "充足" : pTone === "amber" ? "需补充" : "偏少"}
-        </div>
-      </div>
-      <div class="mt-3 h-2 w-full rounded-full bg-slate-200/60 overflow-hidden">
-        <div class="h-full rounded-full transition-all duration-500" style="width:${proteinPct}%;background:${pColors.ring}"></div>
-      </div>
-      ${!isB ? `<div class="text-xs text-slate-500 mt-2 leading-relaxed">${proteinHintText}</div>` : ""}
-      ${!isB ? proteinAgeNote : ""}
+  // 环形颜色：绿色 → 黄色 → 红色（按摄入占比）
+  function ringColorFor(pct) {
+    if (pct >= 100) return "#EF4444";
+    if (pct >= 80) return "#F59E0B";
+    return "var(--brand)";
+  }
+  const calPct = displayTarget > 0 ? (actual / displayTarget) * 100 : 0;
+  const proPct = proteinTarget > 0 ? (actualProtein / proteinTarget) * 100 : 0;
+  const calColor = ringColorFor(calPct);
+  const proColor = ringColorFor(proPct);
+
+  // 双环形图：热量(大) + 蛋白质(小) 重叠
+  function miniRing(percent, color, size, stroke) {
+    const r = (size - stroke) / 2;
+    const c = 2 * Math.PI * r;
+    const pp = clamp(percent, 0, 120);
+    const dash = (c * pp) / 100;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block">
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" stroke="rgba(15,23,42,0.08)" stroke-width="${stroke}" fill="none"></circle>
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round" fill="none"
+        stroke-dasharray="${dash} ${c - dash}" transform="rotate(-90 ${size/2} ${size/2})"></circle>
+    </svg>`;
+  }
+  const doubleRing = `
+    <div style="display:flex;align-items:center;justify-content:center">
+      <div style="position:relative">${miniRing(calPct, calColor, 190, 20)}</div>
+      <div style="position:relative;margin-left:-60px">${miniRing(proPct, proColor, 130, 16)}</div>
     </div>
   `;
 
-  if (isB) {
-    const ring = Ring({
-      percent,
-      labelTop: "今日已摄入",
-      labelMain: `${formatKcal(actual)} kcal`,
-      ringColor: colors.ring,
-    });
+  // 观察期说明
+  const obsNote = isB
+    ? "第 " + dayIdx + " 天观察期。这一周我们不会给任何警告或建议。你只要像平时一样吃（包括水果、点心、饮料等），就能得到更真实、更适合你的基线。"
+    : "基于您的真实饮食习惯计算，目标不是“完美控制”，而是让你更容易停在舒服的位置。";
 
-    const info = Card({
-      className: "mt-5",
-      inner: `
-        <div class="flex items-center justify-between">
-          <div class="text-sm font-medium">观察期说明</div>
-          <div class="pill px-3 py-1 text-xs" style="background: rgba(74,124,89,0.10); color: rgb(39,84,57);">只记录，不评判</div>
-        </div>
-        <div class="mt-3 inline-flex items-center rounded-full border border-brand/10 bg-brand/5 px-3 py-1 text-xs font-medium text-brand">
-          第 ${dayIdx} 天 · 观察期
-        </div>
-        <div class="text-sm text-slate-600 mt-3 leading-relaxed">
-          这一周我们不会给任何警告或建议。你只要像平时一样吃（包括水果，点心，饮料等），就能得到更真实、更适合你的基线。
-        </div>
-      `,
-    });
-
-    return PageShell({
-      title: "首页",
-      activeTab: "home",
-      fab: true,
-      body: `
-        ${summaryCard}
-        ${snackHint}
-        ${quickRecordCard}
-        ${proteinCard}
-        <div class="flex justify-center pt-2">${ring}</div>
-        ${info}
-      `,
-    });
-  }
-
-  // Active
-  const ring = Ring({
-    percent,
-    labelTop: "今日已摄入",
-    labelMain: `${formatKcal(actual)} kcal`,
-    ringColor: colors.ring,
-  });
-
-  const baselineHint = p.adaptive_baseline
-    ? `<div class="text-xs text-slate-500 mt-2">当前自适应基线（过去 7 天均值）：${formatKcal(p.adaptive_baseline)} kcal</div>`
-    : "";
-
-  const status = Card({
-    className: "mt-5",
-    inner: `
-      <div class="flex items-center justify-between">
-        <div class="text-sm font-medium">今天的节奏</div>
-        <div class="pill px-3 py-1 text-xs" style="background:${colors.chipBg}; color:${colors.chipText};">
-          ${tone === "green" ? "余量充足" : tone === "amber" ? "接近目标" : "已超出"}
-        </div>
-      </div>
-      <div class="text-sm text-slate-600 mt-3 leading-relaxed">
-        目标不是“完美控制”，而是让你更容易停在舒服的位置。你随时都可以记录一顿，我们再一起看看。
-      </div>
-      ${baselineHint}
-    `,
-  });
+  const body = `
+    <div class="mt-2">
+      ${Card({
+        inner: `
+          <div class="grid grid-cols-2 gap-3 text-center">
+            <div>
+              <div class="text-xs text-slate-500">今日目标热量</div>
+              <div class="text-lg font-semibold" style="color:var(--brand)">${formatKcal(displayTarget)} kcal</div>
+            </div>
+            <div>
+              <div class="text-xs text-slate-500">今日目标蛋白质</div>
+              <div class="text-lg font-semibold" style="color:var(--amber)">${proteinTarget} g</div>
+            </div>
+          </div>
+        `,
+      })}
+    </div>
+    <div class="mt-4">
+      ${Card({
+        inner: `
+          <div class="grid grid-cols-2 gap-3 text-center mb-3">
+            <div>
+              <div class="text-xs text-slate-500">今日已摄入热量</div>
+              <div class="text-lg font-semibold text-slate-800">${formatKcal(actual)} kcal</div>
+            </div>
+            <div>
+              <div class="text-xs text-slate-500">今日已摄入蛋白质</div>
+              <div class="text-lg font-semibold text-slate-800">${formatGram(actualProtein)} g</div>
+            </div>
+          </div>
+          ${doubleRing}
+          <div class="text-center mt-3 text-sm font-medium text-slate-700">
+            今日还能摄入 <span style="color:var(--brand)">热量 ${formatKcal(remainCal)} kcal</span> ·
+            <span style="color:var(--amber)">蛋白质 ${formatGram(remainPro)} g</span>
+          </div>
+          <div class="text-xs text-slate-400 mt-2 text-center">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--brand);margin-right:2px"></span>绿色圈=热量
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);margin-left:10px;margin-right:2px"></span>橘色圈=蛋白质
+          </div>
+        `,
+      })}
+    </div>
+    <div class="mt-4">
+      ${Card({
+        inner: `<div class="text-sm text-slate-600 leading-relaxed">${escapeHtml(obsNote)}</div>`,
+      })}
+    </div>
+    <div class="mt-4 grid grid-cols-2 gap-4">
+      <a href="#/capture" class="tap flex flex-col items-center justify-center py-6 rounded-2xl" style="background:var(--brand);color:#fff">
+        <div class="text-3xl">📷</div>
+        <div class="text-sm font-medium mt-2">拍照记录</div>
+      </a>
+      <a href="#/textrecord" class="tap flex flex-col items-center justify-center py-6 rounded-2xl" style="background:var(--amber);color:#fff">
+        <div class="text-3xl">✏️</div>
+        <div class="text-sm font-medium mt-2">文字描述</div>
+      </a>
+    </div>
+  `;
 
   return PageShell({
     title: "首页",
     activeTab: "home",
-    fab: true,
-    body: `
-        ${summaryCard}
-        ${snackHint}
-        ${quickRecordCard}
-        ${proteinCard}
-        <div class="flex justify-center pt-2">${ring}</div>
-        ${status}
-      `,
-    });
-  }
+    fab: false,
+    body,
+  });
+}
 
+// 文字描述页：名称/数量/重量 → 确认输入(AI) → 显示营养 → 保存
+function TextRecordPage() {
+  var body = `
+    <div class="mt-2">
+      ${Card({
+        inner: `
+          <div class="text-sm text-slate-500 mb-3">用文字描述你吃了什么，AI 会帮你估算营养。也可以直接手动填写后点"确认输入"。</div>
+          <div class="flex flex-col gap-4">
+            <label class="block">
+              <div class="text-sm text-slate-600 mb-2">食物名称 <span style="color:#c97a86">*</span></div>
+              <input id="trName" type="text" placeholder="如：葡萄 / 米饭 / 鸡蛋" class="w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 outline-none focus:ring-2 focus:ring-brand/30" />
+            </label>
+            <label class="block">
+              <div class="text-sm text-slate-600 mb-2">食物数量（可填）</div>
+              <input id="trAmount" type="text" placeholder="如：1串 / 2个 / 1碗" class="w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 outline-none focus:ring-2 focus:ring-brand/30" />
+            </label>
+            <label class="block">
+              <div class="text-sm text-slate-600 mb-2">重量（g）</div>
+              <input id="trWeight" type="number" inputmode="decimal" min="1" placeholder="如：300" class="w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 outline-none focus:ring-2 focus:ring-brand/30" />
+            </label>
+          </div>
+          <div class="mt-4">${Button({ label: "确认输入", onClick: "trConfirmInput" })}</div>
+        `,
+      })}
+    </div>
+    <div id="trResult" style="display:none" class="mt-4">
+      ${Card({
+        inner: `
+          <div class="text-sm font-medium mb-3" style="color:var(--brand)">🤖 AI 估算结果</div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="rounded-xl p-3" style="background:#f8fafc">
+              <div class="text-xs text-slate-500">热量</div>
+              <div id="trCal" class="text-lg font-semibold text-slate-800">--</div>
+              <div class="text-xs text-slate-400">kcal</div>
+            </div>
+            <div class="rounded-xl p-3" style="background:#f8fafc">
+              <div class="text-xs text-slate-500">蛋白质</div>
+              <div id="trProtein" class="text-lg font-semibold text-slate-800">--</div>
+              <div class="text-xs text-slate-400">g</div>
+            </div>
+            <div class="rounded-xl p-3" style="background:#f8fafc">
+              <div class="text-xs text-slate-500">脂肪</div>
+              <div id="trFat" class="text-lg font-semibold text-slate-800">--</div>
+              <div class="text-xs text-slate-400">g</div>
+            </div>
+            <div class="rounded-xl p-3" style="background:#f8fafc">
+              <div class="text-xs text-slate-500">碳水</div>
+              <div id="trCarbs" class="text-lg font-semibold text-slate-800">--</div>
+              <div class="text-xs text-slate-400">g</div>
+            </div>
+          </div>
+          <div class="text-xs text-slate-400 mt-3">AI估算仅供参考，请核对后保存</div>
+        `,
+      })}
+    </div>
+    <div id="trError" style="display:none" class="mt-4">
+      ${Card({
+        inner: `<div id="trErrorText" class="text-sm" style="color:#B91C1C"></div>`,
+      })}
+    </div>
+    <div class="mt-4 flex gap-3">
+      <button id="trCancel" class="tap flex-1 py-3 rounded-2xl font-medium btn-ghost">取消</button>
+      <button id="trSave" class="tap flex-[2] py-3 rounded-2xl font-medium btn-primary">保存</button>
+    </div>
+  `;
+
+  return PageShell({
+    title: "文字描述",
+    activeTab: "home",
+    fab: false,
+    rightHtml: SmallButton({ label: "返回", onClick: "goHome" }),
+    body,
+  });
+}
+
+function bindTextRecordPage() {
+  var saveBtn = $app.querySelector("#trSave");
+  var cancelBtn = $app.querySelector("#trCancel");
+  if (cancelBtn) cancelBtn.addEventListener("click", function() { navigate("home"); });
+  if (saveBtn) saveBtn.addEventListener("click", async function() {
+    var name = ($app.querySelector("#trName")?.value || "").trim();
+    if (!name) { setToast("请先填写食物名称"); return; }
+    var weight = parseFloat(($app.querySelector("#trWeight")?.value || "").replace(/[^\d.]/g, ""));
+    var cal = parseFloat(($app.querySelector("#trCal")?.textContent || "").replace(/[^\d.]/g, ""));
+    var protein = parseFloat(($app.querySelector("#trProtein")?.textContent || "").replace(/[^\d.]/g, ""));
+    var fat = parseFloat(($app.querySelector("#trFat")?.textContent || "").replace(/[^\d.]/g, ""));
+    var carbs = parseFloat(($app.querySelector("#trCarbs")?.textContent || "").replace(/[^\d.]/g, ""));
+    if (!cal && !protein && !fat && !carbs) {
+      setToast("请先点「确认输入」获取营养数据");
+      return;
+    }
+    var amount = ($app.querySelector("#trAmount")?.value || "").trim();
+    await saveRecord({ name: name, amount: amount, weight: weight, calories: cal, protein: protein, fat: fat, carbs: carbs, source: "text" });
+  });
+}
+
+// 页面3：拍照记录（选图）
 function CapturePage() {
   const p = state.profile;
   const note = p?.is_baseline_complete
-    ? "拍下这一餐，我们会在你确认比例后，再给你一个温和提醒。"
-    : "拍下这一餐就好。观察期只记录，不会给任何建议。";
-
-  const preview = state.draft?.photoUrl
-    ? `<img src="${escapeHtml(state.draft.photoUrl)}" class="w-full rounded-2xl object-cover max-h-[240px]" />`
-    : "";
+    ? "拍下这一餐就好。"
+    : "拍下这一餐就好，观察期只记录，不会给任何建议。";
 
   return PageShell({
     title: "拍照记录",
@@ -2076,33 +2127,84 @@ function CapturePage() {
     fab: false,
     rightHtml: SmallButton({ label: "返回", onClick: "goHome" }),
     body: `
-      ${Card({
-        inner: `
-          <div class="text-sm text-slate-700 leading-relaxed">${note}</div>
-        `,
-      })}
-      ${preview ? `<div class="mt-4">${preview}</div>` : ""}
+      <div class="mt-2">
+        ${Card({
+          inner: `<div class="text-sm text-slate-700 leading-relaxed">${escapeHtml(note)}</div>`,
+        })}
+      </div>
       <div class="mt-5 grid gap-4">
         <button id="btnCaptureCamera" class="tap w-full py-4 rounded-2xl font-medium btn-primary flex items-center justify-center gap-2" style="min-height:56px">
-          📷 直接拍照
+          📷 拍照
         </button>
         <button id="btnCaptureGallery" class="tap w-full py-4 rounded-2xl font-medium btn-ghost flex items-center justify-center gap-2" style="min-height:56px;border-color:var(--brand);color:var(--brand)">
-          🖼️ 从手机选图
+          🖼️ 从手机相册选图
         </button>
       </div>
       <input type="file" id="hiddenCameraInput" accept="image/*" capture="environment" style="position:absolute;left:-9999px;top:-9999px;opacity:0;pointer-events:none;width:1px;height:1px" />
       <input type="file" id="hiddenGalleryInput" accept="image/*" style="position:absolute;left:-9999px;top:-9999px;opacity:0;pointer-events:none;width:1px;height:1px" />
-      ${preview ? `<div class="mt-3 text-center text-sm text-brand font-medium">照片已选择 ✓</div>` : ""}
-      <div class="mt-4 text-center">
+      <div class="mt-6 text-center">
         <button id="btnBackHome" class="tap text-sm font-medium" style="border:none;background:transparent;color:#999;padding:12px">取消</button>
       </div>
-      <div class="text-xs text-slate-500 mt-1 leading-relaxed text-center">
-        也可以不选照片，直接点下方按钮继续。
-      </div>
-      <div class="mt-3">
-        ${Button({ label: "下一步：查看识别结果", onClick: "toRecognize", variant: "ghost" })}
+    `,
+  });
+}
+
+// 页面4：拍摄记录（显示照片预览）
+function PhotoPreviewPage() {
+  const d = state.draft;
+  const photo = d?.photoUrl
+    ? `<img src="${escapeHtml(d.photoUrl)}" class="w-full rounded-2xl object-cover max-h-[420px]" style="display:block" />`
+    : `<div class="rounded-2xl bg-white/70 border border-slate-200 p-4 text-sm text-slate-600">还没有照片。</div>`;
+
+  return PageShell({
+    title: "拍摄记录",
+    activeTab: "home",
+    fab: false,
+    rightHtml: SmallButton({ label: "返回", onClick: "goHome" }),
+    body: `
+      <div class="mt-2">${Card({ inner: photo })}</div>
+      <div class="mt-4 flex gap-3">
+        <button id="btnDeletePhoto" class="tap flex-1 py-3 rounded-2xl font-medium btn-ghost" style="border-color:#c97a86;color:#c97a86">删除照片并返回</button>
+        <button id="btnGoRecognize" class="tap flex-[2] py-3 rounded-2xl font-medium btn-primary">下一步：查看识别结果</button>
       </div>
     `,
+  });
+}
+
+function bindPhotoPreviewPage() {
+  var delBtn = $app.querySelector("#btnDeletePhoto");
+  if (delBtn) delBtn.addEventListener("click", function() {
+    state.draft = null;
+    navigate("home");
+  });
+  var nextBtn = $app.querySelector("#btnGoRecognize");
+  if (nextBtn) nextBtn.addEventListener("click", function() {
+    var d = state.draft;
+    if (!d || !d.photoUrl) { setToast("请先选择照片"); navigate("capture"); return; }
+    setToast("AI 正在识别图片...");
+    var fileData = d.fileData || "";
+    // 识别图片
+    callAIAnalyze({ imageBase64: d.photoUrl })
+      .then(function(result) {
+        if (!result || typeof result !== "object") throw { code: "BAD_JSON" };
+        var items = [{
+          name: result.name || "未命名食物",
+          amount: result.amount || (result.weight_g ? result.weight_g + "g" : "1份"),
+          calories: Number(result.calories_kcal) || 0,
+          protein: Number(result.protein_g) || 0,
+          fat: Number(result.fat_g) || 0,
+          carbs: Number(result.carbs_g) || 0,
+          weight_g: Number(result.weight_g) || 0,
+        }];
+        state.draft = { photoUrl: d.photoUrl, items: items, eatenPercentage: 100, aiSource: "photo" };
+        console.log("✅ 拍照识别:", items[0].name, items[0].calories, "kcal");
+        navigate("recognize");
+      })
+      .catch(function(err) {
+        console.error("拍照识别失败:", err);
+        setToast("识别失败，请重试");
+        navigate("recognize");
+      });
   });
 }
 
@@ -2252,92 +2354,74 @@ function QuickRecordCustomForm() {
   ].join("");
 }
 
+// 页面5：识别结果（照片 + 滑块 + 营养计算 + 确认）
 function RecognizePage() {
-  const d = state.draft;
-  const photo = d?.photoUrl
-    ? `<img src="${escapeHtml(d.photoUrl)}" class="w-full rounded-2xl object-cover max-h-[280px]" />`
+  const d = state.draft || { items: [], eatenPercentage: 100 };
+  const photo = d.photoUrl
+    ? `<img src="${escapeHtml(d.photoUrl)}" class="w-full rounded-2xl object-cover max-h-[300px]" style="display:block" />`
     : `<div class="rounded-2xl bg-white/70 border border-slate-200 p-4 text-sm text-slate-600">还没有选择照片。你可以先回上一步。</div>`;
 
-  // AI 识别中：显示 loading
-  if (d?.aiLoading) {
-    return PageShell({
-      title: "识别结果",
-      activeTab: "home",
-      fab: false,
-      rightHtml: SmallButton({ label: "返回", onClick: "goCapture" }),
-      body: `
-        ${Card({ inner: photo })}
-        <div class="mt-4">
-          ${Card({
-            inner: `
-              <div class="text-center py-6">
-                <div style="display:inline-block;width:28px;height:28px;border:3px solid #E5E7EB;border-top-color:var(--brand);border-radius:50%;animation:aiSpin 0.8s linear infinite"></div>
-                <div class="text-sm mt-3" style="color:var(--brand)">AI 正在识别图片...</div>
-                <div class="text-xs text-slate-500 mt-1">识别完成后自动显示结果</div>
-              </div>
-            `,
-          })}
-        </div>
-      `,
-    });
-  }
+  // 滑块默认 100%
+  const pct = Number(d.eatenPercentage) || 100;
+  const items = d.items || [];
+  const totalW = items.reduce((a, it) => a + (Number(it.weight_g) || 0), 0);
 
-  const items = (d?.items || []).map((it) => {
-    const p = Number(it.protein) || 0;
-    const proteinStr = p > 0 ? ` · 蛋白质 ${formatGram(p)}g` : "";
-    return `
-      <div class="flex items-start justify-between gap-3 py-2">
-        <div>
-          <div class="font-medium">${escapeHtml(it.name)}</div>
-          <div class="text-xs text-slate-500 mt-1">${escapeHtml(it.amount)}</div>
-        </div>
-        <div class="text-sm font-semibold text-slate-700 text-right">${formatKcal(it.calories)} kcal${proteinStr}</div>
-      </div>
-    `;
-  });
-
-  const mealProtein = round(calcMealProtein(d?.items || [], d?.eatenPercentage ?? 100));
-  const proteinLine = mealProtein > 0 ? `<div class="text-xs text-slate-500 mt-2">本餐蛋白质合计：<span class="font-semibold">${formatGram(mealProtein)}g</span></div>` : "";
+  // 文字描述区域（随滑块变化由 bindRecognizeSlider 更新）
+  const descLines = items.map((it) => {
+    const w = Number(it.weight_g) || 0;
+    const share = totalW > 0 ? Math.round(w / totalW * 100) : 0;
+    return `<div class="flex justify-between py-1 text-sm"><span>${escapeHtml(it.name)}（约 ${share}%）</span><span class="text-slate-500">${w > 0 ? w + "g" : it.amount || ""}</span></div>`;
+  }).join("");
 
   return PageShell({
     title: "识别结果",
     activeTab: "home",
     fab: false,
-    rightHtml: SmallButton({ label: "返回", onClick: "goCapture" }),
+    rightHtml: SmallButton({ label: "返回", onClick: "goHome" }),
     body: `
-      ${Card({ inner: photo })}
+      <div class="mt-2">${Card({ inner: photo })}</div>
       <div class="mt-4">
         ${Card({
           inner: `
-            <div class="text-sm text-slate-500">AI 识别结果（可编辑比例）</div>
-            <div class="mt-2 divide-y divide-slate-200/70">${items.join("")}</div>
-            ${proteinLine}
-            ${Divider()}
-            <div class="text-sm font-medium">我吃了这顿的百分之多少</div>
-            <div class="text-xs text-slate-500 mt-1">合餐制也没关系，用大概的比例就足够。</div>
-            <div class="mt-3 flex items-center gap-3">
-              <input
-                id="pct"
-                type="range"
-                min="10"
-                max="100"
-                step="10"
-                value="${d?.eatenPercentage ?? 100}"
-                class="ios-range"
-                style="background:linear-gradient(to right,var(--brand) 0%,var(--brand) ${d?.eatenPercentage ?? 100}%,#E5E7EB ${d?.eatenPercentage ?? 100}%,#E5E7EB 100%)"
-              />
-              <div class="pill px-3 py-1 text-sm font-semibold">${d?.eatenPercentage ?? 100}%</div>
-            </div>
-            <div class="mt-4">${Button({ label: "继续", onClick: "toReview" })}</div>
-            <div class="text-xs text-slate-500 mt-3 leading-relaxed">
-              由通义千问 Qwen-VL 识别，可在后续页面调整份量。
+            <div class="text-sm font-medium mb-2">这餐我吃了多少</div>
+            <div class="text-xs text-slate-500 mb-2">合餐也没关系，用大概的比例就可以</div>
+            <div class="flex items-center gap-3">
+              <input id="pct" type="range" min="10" max="100" step="10" value="${pct}"
+                class="ios-range flex-1"
+                style="background:linear-gradient(to right,var(--brand) 0%,var(--brand) ${pct}%,#E5E7EB ${pct}%,#E5E7EB 100%)" />
+              <div id="pctLabel" class="pill px-3 py-1 text-sm font-semibold">${pct}%</div>
             </div>
           `,
         })}
       </div>
+      <div class="mt-4">
+        ${Card({
+          inner: `
+            <div id="rcDesc" class="divide-y divide-slate-200/70">${descLines}</div>
+            <div class="text-xs text-slate-500 mt-2">总重量：约 <span id="rcTotalW">${totalW > 0 ? totalW + "g" : "--"}</span></div>
+          `,
+        })}
+      </div>
+      <div class="mt-4">
+        ${Card({
+          inner: `
+            <div class="text-sm font-medium mb-3">营养计算</div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="rounded-xl p-3" style="background:#f8fafc"><div class="text-xs text-slate-500">总热量</div><div class="text-lg font-semibold"><span id="rcCal">${formatKcal(round(calcMealTotal(items, pct)))}</span> kcal</div></div>
+              <div class="rounded-xl p-3" style="background:#f8fafc"><div class="text-xs text-slate-500">总蛋白质</div><div class="text-lg font-semibold"><span id="rcPro">${formatGram(round(calcMealProtein(items, pct)))}</span> g</div></div>
+              <div class="rounded-xl p-3" style="background:#f8fafc"><div class="text-xs text-slate-500">总脂肪</div><div class="text-lg font-semibold"><span id="rcFat">${formatGram(round(calcMealFat(items, pct)))}</span> g</div></div>
+              <div class="rounded-xl p-3" style="background:#f8fafc"><div class="text-xs text-slate-500">总碳水</div><div class="text-lg font-semibold"><span id="rcCarbs">${formatGram(round(calcMealCarbs(items, pct)))}</span> g</div></div>
+            </div>
+          `,
+        })}
+      </div>
+      <div class="mt-4">
+        ${Button({ label: "确认", onClick: "confirmRecognize" })}
+      </div>
     `,
   });
 }
+
 
 function ReviewPage() {
   const p = state.profile;
@@ -2423,6 +2507,7 @@ function ReviewPage() {
   });
 }
 
+// 页面6：历史（7天列表）
 function HistoryPage() {
   const p = state.profile;
   if (!p) return OnboardingPage();
@@ -2434,14 +2519,18 @@ function HistoryPage() {
       const a = t?.actual_calories ?? 0;
       const target = t?.target_calories ?? null;
       const tag = t?.is_baseline_day ? `<span class="pill px-2 py-0.5 text-xs" style="background: rgba(74,124,89,0.10); color: rgb(39,84,57);">基线</span>` : "";
-      const right = target == null ? `${formatKcal(a)} kcal` : `${formatKcal(a)} / ${formatKcal(target)} kcal`;
+      // 当天蛋白质合计
+      const dayPro = state.meals
+        .filter((m) => todayStr(new Date(m.created_at)) === ds)
+        .reduce((acc, m) => acc + (Number(m.meal_total_protein) || 0), 0);
+      const right = target == null ? `${formatKcal(a)} kcal` : `${formatKcal(a)} kcal`;
       return `
         <a href="#/day?date=${encodeURIComponent(ds)}" class="tap flex items-center justify-between py-3">
           <div>
             <div class="font-medium">${escapeHtml(ds)}</div>
             <div class="text-xs text-slate-500 mt-1">${tag}</div>
           </div>
-          <div class="text-sm text-slate-700 font-semibold">${right}</div>
+          <div class="text-sm text-slate-700 font-semibold">${right} · 蛋白质 ${formatGram(dayPro)}g</div>
         </a>
       `;
     })
@@ -2451,14 +2540,17 @@ function HistoryPage() {
     title: "历史",
     activeTab: "history",
     fab: false,
+    rightHtml: SmallButton({ label: "返回", onClick: "goHome" }),
     body: `
-      ${Card({
-        inner: `
-          <div class="text-sm text-slate-600 leading-relaxed">
-            这里是过去 7 天的总热量。你点进某一天，会看到那天记录的餐食明细。
-          </div>
-        `,
-      })}
+      <div class="mt-2">
+        ${Card({
+          inner: `
+            <div class="text-sm text-slate-600 leading-relaxed">
+              这里是过去 7 天的总热量。你点进某一天，会看到那天记录的餐食明细。
+            </div>
+          `,
+        })}
+      </div>
       <div class="mt-4">
         ${Card({ inner: `<div class="divide-y divide-slate-200/70">${rows}</div>` })}
       </div>
@@ -2466,6 +2558,7 @@ function HistoryPage() {
   });
 }
 
+// 页面7：当天详情（记录列表 + 删除二次确认）
 function DayDetailPage(dateStr) {
   const p = state.profile;
   if (!p) return OnboardingPage();
@@ -2474,11 +2567,13 @@ function DayDetailPage(dateStr) {
     .filter((m) => todayStr(new Date(m.created_at)) === dateStr)
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
+  const dayPro = meals.reduce((acc, m) => acc + (Number(m.meal_total_protein) || 0), 0);
+
   const header = Card({
     inner: `
       <div class="flex items-center justify-between">
         <div class="font-semibold">${escapeHtml(dateStr)}</div>
-        <div class="text-sm text-slate-600">${formatKcal(t.actual_calories || 0)} kcal</div>
+        <div class="text-sm text-slate-600">${formatKcal(t.actual_calories || 0)} kcal · 蛋白质 ${formatGram(dayPro)}g</div>
       </div>
       <div class="text-xs text-slate-500 mt-2">
         ${t.is_baseline_day ? "基线期：仅记录" : t.target_calories != null ? `目标：${formatKcal(t.target_calories)} kcal` : "目标：—"}
@@ -2493,26 +2588,30 @@ function DayDetailPage(dateStr) {
           const hh = String(time.getHours()).padStart(2, "0");
           const mm = String(time.getMinutes()).padStart(2, "0");
           var items = (m.food_items || []).map(function(it) { return it.name; }).join("、");
-          var sourceTag = m.source === "quickrecord" ? ' <span style="font-size:11px;color:var(--brand)">⚡</span>' : (m.source === "ai_estimate" ? ' <span style="font-size:11px;color:#8B5CF6">🤖</span>' : ' <span style="font-size:11px;color:#999">📷</span>');
-          var p = Number(m.meal_total_protein) || 0;
-          const proteinStr = p > 0 ? ` · 蛋白质 ${formatGram(p)}g` : "";
+          var sourceTag = m.source === "quickrecord" ? "⚡" : (m.source === "text" || m.source === "ai_estimate" ? "🤖" : "📷");
+          var pn = Number(m.meal_total_protein) || 0;
           return `
             <div class="py-3">
               <div class="flex items-start justify-between gap-3">
-                <div>
-                  <div class="font-medium">${hh}:${mm}${sourceTag}</div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium">${hh}:${mm} ${sourceTag}</div>
                   <div class="text-xs text-slate-500 mt-1">${escapeHtml(items || "（无明细）")}</div>
                 </div>
-                <div class="text-sm font-semibold text-slate-700 text-right">${formatKcal(m.meal_total_calories)} kcal${proteinStr}</div>
+                <div class="text-sm font-semibold text-slate-700 text-right shrink-0">${formatKcal(m.meal_total_calories)} kcal · 蛋白质 ${formatGram(pn)}g</div>
+                <button class="day-del-btn tap text-xs shrink-0" data-id="${escapeHtml(m.id)}" style="border:1px solid #e2e8f0;border-radius:8px;background:#fff;color:#c97a86;padding:4px 8px">删除</button>
+              </div>
+              <div id="del_${escapeHtml(m.id)}" style="display:none" class="mt-2 rounded-lg p-2" style2="background:#FEF2F2;border:1px dashed #FCA5A5">
+                <div class="text-xs" style="color:#B91C1C">确认删除这条记录？</div>
+                <div class="flex gap-2 mt-2">
+                  <button class="day-del-cancel tap text-xs flex-1 py-2 rounded-lg" style="background:#e2e8f0;color:#334155;border:none">取消</button>
+                  <button class="day-del-confirm tap text-xs flex-1 py-2 rounded-lg" data-id="${escapeHtml(m.id)}" style="background:#c97a86;color:#fff;border:none">确认删除</button>
+                </div>
               </div>
             </div>
           `;
         })
         .join('<div class="h-px bg-slate-200/70"></div>')
     : `<div class="text-sm text-slate-600 py-6 text-center">这一天还没有记录。也没关系，明天再来。</div>`;
-
-  const dayProtein = meals.reduce((acc, m) => acc + (Number(m.meal_total_protein) || 0), 0);
-  const proteinFooter = meals.length ? `<div class="mt-3 text-xs text-slate-500 text-center">蛋白质合计：<span class="font-semibold">${formatGram(dayProtein)}g</span></div>` : "";
 
   return PageShell({
     title: "当天详情",
@@ -2522,11 +2621,66 @@ function DayDetailPage(dateStr) {
     body: `
       ${header}
       <div class="mt-4">
-        ${Card({ inner: list + proteinFooter })}
+        ${Card({ inner: list })}
       </div>
     `,
   });
 }
+
+function bindDayDetail() {
+  // 点"删除" → 显示二次确认（虚线框）
+  $app.querySelectorAll(".day-del-btn").forEach((btn) => {
+    btn.addEventListener("click", function() {
+      var id = btn.dataset.id;
+      var box = $app.querySelector("#del_" + id);
+      if (!box) return;
+      box.style.display = "block";
+      // 高亮整行
+      var row = btn.closest(".py-3");
+      if (row) { row.style.outline = "1px dashed #FCA5A5"; row.style.borderRadius = "10px"; row.style.background = "#FFF7F7"; }
+    });
+  });
+  // 取消删除
+  $app.querySelectorAll(".day-del-cancel").forEach((btn) => {
+    btn.addEventListener("click", function() {
+      var box = btn.closest("[id^=del_]");
+      if (box) box.style.display = "none";
+      var row = btn.closest(".py-3");
+      if (row) { row.style.outline = ""; row.style.background = ""; }
+    });
+  });
+  // 确认删除
+  $app.querySelectorAll(".day-del-confirm").forEach((btn) => {
+    btn.addEventListener("click", async function() {
+      var id = btn.dataset.id;
+      try {
+        var meals = lsGet(LS_KEYS.meals, []);
+        var target = meals.find((m) => m.id === id);
+        var removed = target;
+        meals = meals.filter((m) => m.id !== id);
+        lsSet(LS_KEYS.meals, meals);
+        // 同步减少当天热量
+        if (removed) {
+          var dateStr = todayStr(new Date(removed.created_at));
+          var row = state.targets.find((x) => x.date === dateStr);
+          if (row) {
+            await dbUpsertDailyTarget({
+              ...row,
+              actual_calories: Math.max(0, (row.actual_calories ?? 0) - (Number(removed.meal_total_calories) || 0)),
+            });
+          }
+        }
+        await reloadData();
+        setToast("已删除");
+        render();
+      } catch (err) {
+        console.error("删除失败:", err);
+        setToast("删除失败，请重试");
+      }
+    });
+  });
+}
+
 
 function SettingsPage() {
   const p = state.profile;
@@ -2694,12 +2848,86 @@ const actions = {
   goQuickRecord() {
     navigate("quickrecord");
   },
+  goTextRecord() {
+    navigate("textrecord");
+  },
+
+  // 文字描述页：确认输入 → 调后端 /api/ai-text → 显示营养
+  async trConfirmInput() {
+    var name = ($app.querySelector("#trName")?.value || "").trim();
+    var weight = ($app.querySelector("#trWeight")?.value || "").trim();
+    var amount = ($app.querySelector("#trAmount")?.value || "").trim();
+    if (!name) { setToast("请先填写食物名称"); return; }
+    var text = [name, amount, weight ? weight + "g" : ""].filter(Boolean).join("，");
+    var resultBox = $app.querySelector("#trResult");
+    var errorBox = $app.querySelector("#trError");
+    if (resultBox) resultBox.style.display = "none";
+    if (errorBox) errorBox.style.display = "none";
+    setToast("AI正在估算...");
+    try {
+      var result = await callAIAnalyze({ text: text });
+      if (!result || typeof result !== "object") throw { code: "BAD_JSON" };
+      // 若用户填了重量但 AI 返回的是默认份量，按重量比例换算
+      var w = parseFloat(weight);
+      var cal = Number(result.calories_kcal) || 0;
+      var protein = Number(result.protein_g) || 0;
+      var fat = Number(result.fat_g) || 0;
+      var carbs = Number(result.carbs_g) || 0;
+      if (w > 0 && result.weight_g && Number(result.weight_g) > 0 && Math.abs(Number(result.weight_g) - w) > 1) {
+        var k = w / Number(result.weight_g);
+        cal = Math.round(cal * k);
+        protein = round1(protein * k);
+        fat = round1(fat * k);
+        carbs = round1(carbs * k);
+      }
+      var setv = function(id, v) { var el = $app.querySelector(id); if (el) el.textContent = v; };
+      setv("#trCal", cal);
+      setv("#trProtein", protein);
+      setv("#trFat", fat);
+      setv("#trCarbs", carbs);
+      if (resultBox) resultBox.style.display = "block";
+      console.log("✅ 文字确认输入:", name, "→", cal, "kcal");
+    } catch (err) {
+      console.error("文字估算失败:", err);
+      var et = $app.querySelector("#trErrorText");
+      if (et) et.textContent = "AI 估算失败，请重试或手动填写";
+      if (errorBox) errorBox.style.display = "block";
+    }
+  },
 
   goSettings() {
     navigate("settings");
   },
   goRecognize() {
     navigate("recognize");
+  },
+
+  // 识别结果页：确认 → 保存记录 → 跳转历史
+  async confirmRecognize() {
+    const d = state.draft;
+    if (!d || !d.items || !d.items.length) {
+      setToast("还没有识别结果，请返回重新拍照");
+      return;
+    }
+    const pct = Number($app.querySelector("#pct")?.value || 100);
+    d.eatenPercentage = pct;
+    const total = round(calcMealTotal(d.items, pct));
+    const protein = round(calcMealProtein(d.items, pct));
+    const fat = round(calcMealFat(d.items, pct));
+    const carbs = round(calcMealCarbs(d.items, pct));
+    const it = d.items[0];
+    await saveRecord({
+      name: it.name,
+      amount: it.amount,
+      weight: it.weight_g,
+      calories: total,
+      protein: protein,
+      fat: fat,
+      carbs: carbs,
+      source: "photo",
+      photoUrl: d.photoUrl || "",
+      eatenPercentage: pct,
+    });
   },
 
   goToActivityStep() {
@@ -2989,6 +3217,52 @@ const actions = {
     navigate("home");
   },
 };
+
+// ============================
+// 统一保存函数（所有入口共用）
+// data: {name, amount, weight, calories, protein, fat, carbs, source, photoUrl, eatenPercentage}
+// 写入 eg_meals + 累加当日热量 → toast → 跳转历史
+// ============================
+async function saveRecord(data) {
+  try {
+    console.log("保存前数据:", JSON.stringify(data));
+    var cal = Number(data.calories) || 0;
+    var protein = Number(data.protein) || 0;
+    var fat = Number(data.fat) || 0;
+    var carbs = Number(data.carbs) || 0;
+    var amount = data.amount || (data.weight ? data.weight + "g" : "1份");
+    var name = data.name || "未命名食物";
+    var items = [{ name: name, amount: amount, calories: cal, protein: protein, fat: fat, carbs: carbs }];
+    var meal = {
+      id: uid(),
+      user_id: state.userId,
+      photo_url: data.photoUrl || "",
+      food_items: items,
+      eaten_percentage: Number(data.eatenPercentage) || 100,
+      meal_total_calories: cal,
+      meal_total_protein: protein,
+      source: data.source || "quickrecord",
+      created_at: new Date().toISOString(),
+    };
+    await dbInsertMeal(meal);
+    console.log("已存入localStorage eg_meals:", localStorage.getItem(LS_KEYS.meals));
+    var dateStr = todayStr();
+    var row = await ensureTodayRows(state.userId, state.profile, dateStr);
+    await dbUpsertDailyTarget({ user_id: row.user_id, date: row.date, actual_calories: (row.actual_calories ?? 0) + cal, is_baseline_day: isBaseline(state.profile, dateStr), target_calories: row.target_calories });
+    state.profile = await maybeCompleteBaseline(state.userId, state.profile, dateStr);
+    await ensureTodayTarget(state.userId, state.profile, dateStr);
+    await reloadData();
+    console.log("保存成功：" + name + " " + cal + "kcal");
+    state.draft = null;
+    setToast("已保存：" + name + " " + cal + "kcal");
+    setTimeout(function() { navigate("history"); render(); }, 1000);
+    return true;
+  } catch (err) {
+    console.error("saveRecord 失败:", err);
+    setToast("保存失败，请重试");
+    return false;
+  }
+}
 
 async function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -3536,12 +3810,32 @@ function bindQuickRecordCustomForm() {
 function bindRecognizeSlider() {
   const pct = $app.querySelector("#pct");
   if (!pct) return;
-  const pill = pct.parentElement?.querySelector(".pill");
+  const pill = $app.querySelector("#pctLabel") || pct.parentElement?.querySelector(".pill");
+  const d = state.draft || { items: [] };
+  const items = d.items || [];
   const update = () => {
     const v = Number(pct.value || 100);
     if (pill) pill.textContent = `${v}%`;
-    // 动态更新轨道渐变
     if (pct) pct.style.background = `linear-gradient(to right, var(--brand) 0%, var(--brand) ${v}%, #E5E7EB ${v}%, #E5E7EB 100%)`;
+    // 实时更新营养
+    const setNum = (id, val) => { const el = $app.querySelector(id); if (el) el.textContent = formatKcal(round(val)); };
+    const setGram = (id, val) => { const el = $app.querySelector(id); if (el) el.textContent = formatGram(round(val)); };
+    setNum("#rcCal", calcMealTotal(items, v));
+    setGram("#rcPro", calcMealProtein(items, v));
+    setGram("#rcFat", calcMealFat(items, v));
+    setGram("#rcCarbs", calcMealCarbs(items, v));
+    // 实时更新文字描述（食材 + 百分比）
+    const totalW = items.reduce((a, it) => a + (Number(it.weight_g) || 0), 0);
+    const descEl = $app.querySelector("#rcDesc");
+    const totalWEl = $app.querySelector("#rcTotalW");
+    if (descEl) {
+      descEl.innerHTML = items.map((it) => {
+        const w = Number(it.weight_g) || 0;
+        const share = totalW > 0 ? Math.round(w / totalW * 100) : 0;
+        return `<div class="flex justify-between py-1 text-sm"><span>${escapeHtml(it.name)}（约 ${share}%）</span><span class="text-slate-500">${w > 0 ? w + "g" : it.amount || ""}</span></div>`;
+      }).join("");
+    }
+    if (totalWEl) totalWEl.textContent = totalW > 0 ? totalW + "g" : "--";
   };
   pct.addEventListener("input", update);
   update();
@@ -3618,43 +3912,21 @@ function bindCaptureButtons() {
   const btnGal = $app.querySelector("#btnCaptureGallery");
   const btnBack = $app.querySelector("#btnBackHome");
 
-  // 通用：处理文件选择
+  // 通用：处理文件选择 → 存 draft → 跳转"拍摄记录"预览页
   const handleFile = (input) => {
     const file = input?.files?.[0];
     console.log("[EatGuard] change event, files:", input?.files?.length, file?.name);
     if (!file) return;
 
-    setToast("图片压缩中...");
-    compressImage(file, async (dataUrl) => {
+    setToast("图片处理中...");
+    compressImage(file, (dataUrl) => {
       if (!dataUrl) {
         setToast("图片处理失败，请重试。");
         return;
       }
       console.log("[EatGuard] dataUrl ready, length:", dataUrl.length);
-      // 先显示照片预览，同时发起 AI 识别
-      state.draft = { photoUrl: dataUrl, items: [], eatenPercentage: 100, aiLoading: true };
-      render();
-      setToast("正在 AI 识别食物...");
-      console.log("🚀 Capture 流程发送图片识别请求 → /api/ai-image");
-      try {
-        const result = await callAIAnalyze({ imageBase64: dataUrl });
-        if (!result || typeof result !== "object") throw { code: "BAD_JSON" };
-        const items = [{
-          name: result.name || "未命名食物",
-          amount: result.amount || (result.weight_g ? result.weight_g + "g" : "1份"),
-          calories: Number(result.calories_kcal) || 0,
-          protein: Number(result.protein_g) || 0,
-          fat: Number(result.fat_g) || 0,
-          carbs: Number(result.carbs_g) || 0,
-        }];
-        console.log("[EatGuard] ✅ AI 识别完成:", items[0].name, items[0].calories, "kcal, source=ai_estimate");
-        state.draft = { photoUrl: dataUrl, items: items, eatenPercentage: 100, aiLoading: false, aiSource: "ai_estimate" };
-        setToast("AI 识别完成：" + items[0].name);
-      } catch (err) {
-        console.error("[EatGuard] AI 识别失败，使用示例数据兜底:", err);
-        state.draft = { photoUrl: dataUrl, items: pickSimulatedItems(), eatenPercentage: 100, aiLoading: false };
-        setToast("AI 识别失败，已用示例数据，可手动修改");
-      }
+      state.draft = { photoUrl: dataUrl, items: [], eatenPercentage: 100 };
+      navigate("photopreview");
       render();
       setTimeout(() => setToast("照片已选择"), 300);
     });
@@ -3751,11 +4023,25 @@ function render() {
     return;
   }
 
+  if (path === "photopreview") {
+    $app.innerHTML = PhotoPreviewPage();
+    bindClicks();
+    bindPhotoPreviewPage();
+    return;
+  }
+
   if (path === "quickrecord") {
     state.qrCategory = state.qrCategory || "饮品";
     $app.innerHTML = QuickRecordPage();
     bindClicks();
     bindQuickRecord();
+    return;
+  }
+
+  if (path === "textrecord") {
+    $app.innerHTML = TextRecordPage();
+    bindClicks();
+    bindTextRecordPage();
     return;
   }
 
@@ -3782,6 +4068,7 @@ function render() {
     const ds = query.date || todayStr();
     $app.innerHTML = DayDetailPage(ds);
     bindClicks();
+    bindDayDetail();
     return;
   }
 

@@ -155,7 +155,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260805202821";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260805213512";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -1927,7 +1927,7 @@ function HomePage() {
   const calColor = ringColorFor(calPct);
   const proColor = ringColorFor(proPct);
 
-  // 双环形图：热量(大) + 蛋白质(小) 重叠
+  // 双环形图：外圈(热量) + 内圈(蛋白质) 同心圆嵌套，中间显示剩余
   function miniRing(percent, color, size, stroke) {
     const r = (size - stroke) / 2;
     const c = 2 * Math.PI * r;
@@ -1939,10 +1939,20 @@ function HomePage() {
         stroke-dasharray="${dash} ${c - dash}" transform="rotate(-90 ${size/2} ${size/2})"></circle>
     </svg>`;
   }
+  // 同心圆：外圈 200px(热量) + 内圈 130px(蛋白质)，中间空白放文字
   const doubleRing = `
-    <div style="display:flex;align-items:center;justify-content:center">
-      <div style="position:relative">${miniRing(calPct, calColor, 190, 20)}</div>
-      <div style="position:relative;margin-left:-60px">${miniRing(proPct, proColor, 130, 16)}</div>
+    <div style="display:flex;align-items:center;justify-content:center;padding:8px 0">
+      <div style="position:relative;width:200px;height:200px">
+        ${miniRing(calPct, calColor, 200, 18)}
+        <div style="position:absolute;top:0;left:0;display:grid;place-items:center;width:200px;height:200px">
+          ${miniRing(proPct, proColor, 128, 14)}
+        </div>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 8px">
+          <div class="text-xs text-slate-500">今日还能摄入</div>
+          <div class="text-sm font-semibold mt-1" style="color:var(--brand)">热量 ${formatKcal(remainCal)} kcal</div>
+          <div class="text-sm font-semibold" style="color:var(--amber)">蛋白质 ${formatGram(remainPro)} g</div>
+        </div>
+      </div>
     </div>
   `;
 
@@ -1950,6 +1960,18 @@ function HomePage() {
   const obsNote = isB
     ? "第 " + dayIdx + " 天观察期。这一周我们不会给任何警告或建议。你只要像平时一样吃（包括水果、点心、饮料等），就能得到更真实、更适合你的基线。"
     : "基于您的真实饮食习惯计算，目标不是“完美控制”，而是让你更容易停在舒服的位置。";
+
+  // 按钮区：📷 相机（绿） | ✏️ 文字描述（橘）并排，放在环形图下方、观察文案上方
+  const entryButtons = `
+    <div class="mt-4 grid grid-cols-2 gap-3">
+      <a href="#/capture" class="tap flex items-center justify-center gap-2 py-4 rounded-2xl" style="background:var(--brand);color:#fff;font-weight:500;min-height:56px">
+        <span style="font-size:22px">📷</span><span>拍照记录</span>
+      </a>
+      <a href="#/textrecord" class="tap flex items-center justify-center gap-2 py-4 rounded-2xl" style="background:var(--amber);color:#fff;font-weight:500;min-height:56px">
+        <span style="font-size:22px">✏️</span><span>文字描述</span>
+      </a>
+    </div>
+  `;
 
   const body = `
     <div class="mt-2">
@@ -1971,7 +1993,7 @@ function HomePage() {
     <div class="mt-4">
       ${Card({
         inner: `
-          <div class="grid grid-cols-2 gap-3 text-center mb-3">
+          <div class="grid grid-cols-2 gap-3 text-center mb-2">
             <div>
               <div class="text-xs text-slate-500">今日已摄入热量</div>
               <div class="text-lg font-semibold text-slate-800">${formatKcal(actual)} kcal</div>
@@ -1982,31 +2004,18 @@ function HomePage() {
             </div>
           </div>
           ${doubleRing}
-          <div class="text-center mt-3 text-sm font-medium text-slate-700">
-            今日还能摄入 <span style="color:var(--brand)">热量 ${formatKcal(remainCal)} kcal</span> ·
-            <span style="color:var(--amber)">蛋白质 ${formatGram(remainPro)} g</span>
-          </div>
-          <div class="text-xs text-slate-400 mt-2 text-center">
+          <div class="text-xs text-slate-400 mt-1 text-center">
             <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--brand);margin-right:2px"></span>绿色圈=热量
             <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);margin-left:10px;margin-right:2px"></span>橘色圈=蛋白质
           </div>
         `,
       })}
     </div>
+    ${entryButtons}
     <div class="mt-4">
       ${Card({
         inner: `<div class="text-sm text-slate-600 leading-relaxed">${escapeHtml(obsNote)}</div>`,
       })}
-    </div>
-    <div class="mt-4 grid grid-cols-2 gap-4">
-      <a href="#/capture" class="tap flex flex-col items-center justify-center py-6 rounded-2xl" style="background:var(--brand);color:#fff">
-        <div class="text-3xl">📷</div>
-        <div class="text-sm font-medium mt-2">拍照记录</div>
-      </a>
-      <a href="#/textrecord" class="tap flex flex-col items-center justify-center py-6 rounded-2xl" style="background:var(--amber);color:#fff">
-        <div class="text-3xl">✏️</div>
-        <div class="text-sm font-medium mt-2">文字描述</div>
-      </a>
     </div>
   `;
 

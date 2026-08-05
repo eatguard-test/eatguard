@@ -311,7 +311,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260806052935";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260806064946";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -937,19 +937,19 @@ function calcMealTotal(items, eatenPercentage) {
 function calcMealProtein(items, eatenPercentage) {
   const raw = sumItemsProtein(items);
   const factor = clamp(Number(eatenPercentage) / 100, 0.1, 1);
-  return round(raw * factor);
+  return round1(raw * factor); // 保留 1 位小数
 }
 
 function calcMealFat(items, eatenPercentage) {
   const raw = (items || []).reduce((acc, it) => acc + (Number(it.fat) || 0), 0);
   const factor = clamp(Number(eatenPercentage) / 100, 0.1, 1);
-  return round(raw * factor);
+  return round1(raw * factor); // 保留 1 位小数
 }
 
 function calcMealCarbs(items, eatenPercentage) {
   const raw = (items || []).reduce((acc, it) => acc + (Number(it.carbs) || 0), 0);
   const factor = clamp(Number(eatenPercentage) / 100, 0.1, 1);
-  return round(raw * factor);
+  return round1(raw * factor); // 保留 1 位小数
 }
 
 function calcDailyProteinTarget(profile) {
@@ -1010,7 +1010,8 @@ function proteinProgressTone(actual, target) {
 }
 
 function formatGram(g) {
-  return Math.round(g);
+  // 保留 1 位小数（如 0.4g、2.1g），避免滑块缩放后蛋白/脂肪等小数值被取整成 0
+  return Math.round((Number(g) || 0) * 10) / 10;
 }
 // ===== 快速记录预设食物 =====
 const FOOD_PRESETS = {
@@ -2122,7 +2123,7 @@ function HomePage() {
     const dy = cy + r * Math.sin(ang);
     const dotR = stroke / 2 + 2;
     const dot = dash > 0
-      ? `<circle cx="${dx}" cy="${dy}" r="${dotR}" fill="${progress}"></circle>`
+      ? `<circle cx="${dx}" cy="${dy}" r="${dotR}" fill="${progress}" stroke="#ffffff" stroke-width="2"></circle>`
       : "";
     return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block">
       <circle cx="${cx}" cy="${cy}" r="${r}" stroke="${track}" stroke-width="${stroke}" fill="none"></circle>
@@ -2567,12 +2568,14 @@ function RecognizePage() {
   const pct = Number(d.eatenPercentage) || 100;
   const items = d.items || [];
   const totalW = items.reduce((a, it) => a + (Number(it.weight_g) || 0), 0);
+  const initFactor = clamp(pct / 100, 0.1, 1); // 初始比例（与滑块 update 逻辑一致）
 
   // 文字描述区域（随滑块变化由 bindRecognizeSlider 更新）
   const descLines = items.map((it) => {
     const w = Number(it.weight_g) || 0;
-    const share = totalW > 0 ? Math.round(w / totalW * 100) : 0;
-    return `<div class="flex justify-between py-1 text-sm"><span>${escapeHtml(it.name)}（约 ${share}%）</span><span class="text-slate-500">${w > 0 ? w + "g" : it.amount || ""}</span></div>`;
+    const share = totalW > 0 ? Math.round(w / totalW * 100 * initFactor) : 0;
+    const eaten = Math.round(w * initFactor);
+    return `<div class="flex justify-between py-1 text-sm"><span>${escapeHtml(it.name)}（约 ${share}%）</span><span class="text-slate-500">${eaten > 0 ? eaten + "g" : it.amount || ""}</span></div>`;
   }).join("");
 
   return PageShell({
@@ -2600,7 +2603,7 @@ function RecognizePage() {
         ${Card({
           inner: `
             <div id="rcDesc" class="divide-y divide-slate-200/70">${descLines}</div>
-            <div class="text-xs text-slate-500 mt-2">总重量：约 <span id="rcTotalW">${totalW > 0 ? totalW + "g" : "--"}</span></div>
+            <div class="text-xs text-slate-500 mt-2">总重量：约 <span id="rcTotalW">${totalW > 0 ? Math.round(totalW * initFactor) + "g" : "--"}</span></div>
           `,
         })}
       </div>
@@ -2609,10 +2612,10 @@ function RecognizePage() {
           inner: `
             <div class="text-sm font-medium mb-3">营养计算</div>
             <div class="grid grid-cols-2 gap-3">
-              <div class="rounded-xl p-3" style="background:#f8fafc"><div class="text-xs text-slate-500">总热量</div><div class="text-lg font-semibold"><span id="rcCal">${formatKcal(round(calcMealTotal(items, pct)))}</span> kcal</div></div>
-              <div class="rounded-xl p-3" style="background:#f8fafc"><div class="text-xs text-slate-500">总蛋白质</div><div class="text-lg font-semibold"><span id="rcPro">${formatGram(round(calcMealProtein(items, pct)))}</span> g</div></div>
-              <div class="rounded-xl p-3" style="background:#f8fafc"><div class="text-xs text-slate-500">总脂肪</div><div class="text-lg font-semibold"><span id="rcFat">${formatGram(round(calcMealFat(items, pct)))}</span> g</div></div>
-              <div class="rounded-xl p-3" style="background:#f8fafc"><div class="text-xs text-slate-500">总碳水</div><div class="text-lg font-semibold"><span id="rcCarbs">${formatGram(round(calcMealCarbs(items, pct)))}</span> g</div></div>
+              <div class="rounded-xl p-3" style="background:#f8fafc"><div class="text-xs text-slate-500">总热量</div><div class="text-lg font-semibold"><span id="rcCal">${formatKcal(calcMealTotal(items, pct))}</span> kcal</div></div>
+              <div class="rounded-xl p-3" style="background:#f8fafc"><div class="text-xs text-slate-500">总蛋白质</div><div class="text-lg font-semibold"><span id="rcPro">${formatGram(calcMealProtein(items, pct))}</span> g</div></div>
+              <div class="rounded-xl p-3" style="background:#f8fafc"><div class="text-xs text-slate-500">总脂肪</div><div class="text-lg font-semibold"><span id="rcFat">${formatGram(calcMealFat(items, pct))}</span> g</div></div>
+              <div class="rounded-xl p-3" style="background:#f8fafc"><div class="text-xs text-slate-500">总碳水</div><div class="text-lg font-semibold"><span id="rcCarbs">${formatGram(calcMealCarbs(items, pct))}</span> g</div></div>
             </div>
           `,
         })}
@@ -4024,27 +4027,32 @@ function bindRecognizeSlider() {
     const v = Number(pct.value || 100);
     if (pill) pill.textContent = `${v}%`;
     if (pct) pct.style.background = `linear-gradient(to right, var(--brand) 0%, var(--brand) ${v}%, #E5E7EB ${v}%, #E5E7EB 100%)`;
-    // 实时更新营养
-    const setNum = (id, val) => { const el = $app.querySelector(id); if (el) el.textContent = formatKcal(round(val)); };
-    const setGram = (id, val) => { const el = $app.querySelector(id); if (el) el.textContent = formatGram(round(val)); };
+    // 实时更新营养（formatGram 已保留 1 位小数，不要再取整）
+    const setNum = (id, val) => { const el = $app.querySelector(id); if (el) el.textContent = formatKcal(val); };
+    const setGram = (id, val) => { const el = $app.querySelector(id); if (el) el.textContent = formatGram(val); };
     setNum("#rcCal", calcMealTotal(items, v));
     setGram("#rcPro", calcMealProtein(items, v));
     setGram("#rcFat", calcMealFat(items, v));
     setGram("#rcCarbs", calcMealCarbs(items, v));
-    // 实时更新文字描述（食材 + 百分比）
+    // 实时更新文字描述（食材 + 百分比 + 重量，全部按滑块比例换算）
     const totalW = items.reduce((a, it) => a + (Number(it.weight_g) || 0), 0);
+    const factor = clamp(v / 100, 0.1, 1); // 滑块比例
+    const eatenW = totalW * factor;        // 吃掉的总重量
     const descEl = $app.querySelector("#rcDesc");
     const totalWEl = $app.querySelector("#rcTotalW");
     if (descEl) {
       descEl.innerHTML = items.map((it) => {
         const w = Number(it.weight_g) || 0;
-        const share = totalW > 0 ? Math.round(w / totalW * 100) : 0;
-        return `<div class="flex justify-between py-1 text-sm"><span>${escapeHtml(it.name)}（约 ${share}%）</span><span class="text-slate-500">${w > 0 ? w + "g" : it.amount || ""}</span></div>`;
+        // 百分比 = 该食材原始占比 × 滑块比例（跟随滑块值变化）
+        const share = totalW > 0 ? Math.round(w / totalW * 100 * factor) : 0;
+        const eaten = Math.round(w * factor); // 该食材吃掉重量
+        return `<div class="flex justify-between py-1 text-sm"><span>${escapeHtml(it.name)}（约 ${share}%）</span><span class="text-slate-500">${eaten > 0 ? eaten + "g" : it.amount || ""}</span></div>`;
       }).join("");
     }
-    if (totalWEl) totalWEl.textContent = totalW > 0 ? totalW + "g" : "--";
+    if (totalWEl) totalWEl.textContent = eatenW > 0 ? Math.round(eatenW) + "g" : "--";
   };
   pct.addEventListener("input", update);
+  pct.addEventListener("change", update); // 兼容 change 事件
   update();
 }
 

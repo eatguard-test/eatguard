@@ -311,7 +311,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260806102036";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260806112904";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -2130,26 +2130,25 @@ function HomePage() {
     const dot = dash > 0
       ? `<circle cx="${dx}" cy="${dy}" r="${dotR}" fill="${progress}" stroke="#ffffff" stroke-width="2"></circle>`
       : "";
-    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block">
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;width:100%;height:100%">
       <circle cx="${cx}" cy="${cy}" r="${r}" stroke="${track}" stroke-width="${stroke}" fill="none"></circle>
       <circle cx="${cx}" cy="${cy}" r="${r}" stroke="${progress}" stroke-width="${stroke}" stroke-linecap="round" fill="none"
         stroke-dasharray="${dash} ${c - dash}" transform="rotate(-90 ${cx} ${cy})"></circle>
       ${dot}
     </svg>`;
   }
-  // 同心圆紧贴：外圈 200px(stroke 18, 内边缘 82) + 内圈 164px(stroke 18, 外边缘 82)
-  // 两环粗细一致，中间留 64px 直径空白放文字
+  // 同心圆紧贴：外圈(热量, stroke 18) + 内圈(蛋白质, stroke 18)
+  // 响应式容器：max-width 100% + aspect-ratio 1/1 保持正圆，任何屏幕宽度都不变形
+  // 中心文字：top/left 50% + translate(-50%,-50%) 精确绝对居中，不用任何固定像素偏移
   const doubleRing = `
     <div style="display:flex;align-items:center;justify-content:center;padding:8px 0">
-      <div style="position:relative;width:200px;height:200px">
-        ${miniRing(calPct, calColor, calTrack, 200, 18)}
-        <div style="position:absolute;top:0;left:0;display:grid;place-items:center;width:200px;height:200px">
-          ${miniRing(proPct, proColor, proTrack, 164, 18)}
-        </div>
-        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 8px">
-          <div class="text-xs text-slate-500">今日还能摄入</div>
-          <div class="text-sm font-semibold mt-1" style="color:${calColor}">热量: ${formatKcal(remainCal)} kcal</div>
-          <div class="text-sm font-semibold" style="color:${proColor}">蛋白质: ${formatGram(remainPro)} g</div>
+      <div style="position:relative;width:min(280px,100%);aspect-ratio:1/1;max-width:100%">
+        <div style="position:absolute;inset:0">${miniRing(calPct, calColor, calTrack, 200, 18)}</div>
+        <div style="position:absolute;inset:0;display:grid;place-items:center">${miniRing(proPct, proColor, proTrack, 164, 18)}</div>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:70%;text-align:center">
+          <div class="text-xs text-slate-500" style="line-height:1.4">今日还能摄入</div>
+          <div class="text-sm font-semibold mt-1" style="color:${calColor};line-height:1.4;white-space:nowrap">热量: ${formatKcal(remainCal)} kcal</div>
+          <div class="text-sm font-semibold" style="color:${proColor};line-height:1.4;white-space:nowrap">蛋白质: ${formatGram(remainPro)} g</div>
         </div>
       </div>
     </div>

@@ -311,7 +311,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260806113522";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260806115006";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -2130,8 +2130,8 @@ function HomePage() {
     const dot = dash > 0
       ? `<circle cx="${dx}" cy="${dy}" r="${dotR}" fill="${progress}" stroke="#ffffff" stroke-width="2"></circle>`
       : "";
-    // SVG 固定 width/height（=size），不设百分比缩放，避免 iOS 旧版 aspect-ratio 兼容问题
-    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block">
+    // SVG 固定 width/height（=size），flex:none + max-width:none 防止 flex/absolute 容器拉伸变形（iOS WebKit）
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;flex:none;max-width:none">
       <circle cx="${cx}" cy="${cy}" r="${r}" stroke="${track}" stroke-width="${stroke}" fill="none"></circle>
       <circle cx="${cx}" cy="${cy}" r="${r}" stroke="${progress}" stroke-width="${stroke}" stroke-linecap="round" fill="none"
         stroke-dasharray="${dash} ${c - dash}" transform="rotate(-90 ${cx} ${cy})"></circle>
@@ -2144,8 +2144,8 @@ function HomePage() {
   const doubleRing = `
     <div style="display:flex;align-items:center;justify-content:center;padding:8px 0;overflow:hidden">
       <div style="position:relative;width:280px;height:280px;max-width:100%;flex:none">
-        <div style="position:absolute;top:0;left:0;width:280px;height:280px">${miniRing(calPct, calColor, calTrack, 200, 18)}</div>
-        <div style="position:absolute;top:0;left:0;width:280px;height:280px;display:flex;align-items:center;justify-content:center">${miniRing(proPct, proColor, proTrack, 164, 18)}</div>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)">${miniRing(calPct, calColor, calTrack, 200, 18)}</div>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)">${miniRing(proPct, proColor, proTrack, 164, 18)}</div>
         <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:190px;text-align:center">
           <div class="text-xs text-slate-500" style="line-height:1.4">今日还能摄入</div>
           <div class="text-sm font-semibold mt-1" style="color:${calColor};line-height:1.4;white-space:nowrap">热量: ${formatKcal(remainCal)} kcal</div>

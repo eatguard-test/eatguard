@@ -311,7 +311,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260806115006";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260806152915";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -1205,13 +1205,17 @@ function estimateFoodAI(name, amountStr) {
 // ===== AI 智能估算（后端转发：文字→DeepSeek / 图片→通义千问 Qwen-VL）=====
 // 安全：前端不含任何 API Key，全部由 backend/ 服务转发
 
-// 后端地址：config.aiBackendUrl > 当前页面(HTTP托管模式，含手机局域网访问) > localStorage > 默认
+// 后端地址：config.aiBackendUrl > 当前页面同源托管(HTTP 局域网 / Vercel) > localStorage > 默认
 function getBackendUrl() {
   var cfg = (window.EATGUARD_CONFIG && window.EATGUARD_CONFIG.aiBackendUrl) || "";
   if (cfg) return cfg.replace(/\/+$/, "");
   // 页面由后端托管（HTTP 同源模式）：手机通过局域网 IP 访问时，AI 请求必须发往同一地址
   // （否则手机上的 localhost 指向手机自己，连不上电脑后端）
   if (typeof location !== "undefined" && location.protocol === "http:") {
+    return location.origin;
+  }
+  // Vercel 部署：页面与 API 同源（https://<项目>.vercel.app/api/...），无需再连 localhost
+  if (typeof location !== "undefined" && /\.vercel\.app$/.test(location.hostname)) {
     return location.origin;
   }
   var saved = lsGet("eatguard_backend_url", "");
@@ -3120,7 +3124,7 @@ const actions = {
       // 区分错误类型，给出更具体的提示
       var code = err && err.code ? err.code : "";
       if (code === "MIXED_CONTENT") {
-        lightToast("当前是线上HTTPS页面，请改用：电脑 http://localhost:3000 或手机 http://192.168.31.197:3000");
+        lightToast("线上页无法用AI：请用电脑 http://localhost:3000 或手机 http://192.168.31.197:3000 测生僻食物；常见食物在本页可直接填");
       } else if (code === "NETWORK" || code === "TIMEOUT") {
         lightToast("网络错误，请检查后端是否运行");
       } else {

@@ -311,7 +311,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260806070926";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260806102036";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -3120,7 +3120,7 @@ const actions = {
       // 区分错误类型，给出更具体的提示
       var code = err && err.code ? err.code : "";
       if (code === "MIXED_CONTENT") {
-        lightToast("请用 http://localhost:3000 打开本页面（HTTPS 页面不能访问本地后端）");
+        lightToast("当前是线上HTTPS页面，请改用：电脑 http://localhost:3000 或手机 http://192.168.31.197:3000");
       } else if (code === "NETWORK" || code === "TIMEOUT") {
         lightToast("网络错误，请检查后端是否运行");
       } else {

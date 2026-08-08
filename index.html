@@ -311,7 +311,7 @@ body {
   background: #E5E7EB;
 }
 
-</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260806182324";</script><script>// EatGuard 配置（可选）
+</style><script>window.tailwind={"theme": {"extend": {"fontFamily": {"sans": ["Inter"]}, "colors": {"brand": {"DEFAULT": "#4A7C59"}, "calm": {"bg0": "#F0F4F1", "amber": "#D9A441", "rose": "#C97A86"}}}}};</script><script src="https://cdn.tailwindcss.com"></script></head><body style="margin:0;padding:0;width:100%;overflow-x:hidden"><div id="app" style="min-height:100dvh;width:100%"></div><script>var _b="20260808201141";</script><script>// EatGuard 配置（可选）
 // - 默认使用本地存储（localStorage）运行，不依赖后端。
 // - 如需启用 Supabase：把下面的 supabaseUrl / supabaseAnonKey 填上即可。
 //
@@ -2141,10 +2141,10 @@ function HomePage() {
   const remainCal = Math.max(0, displayTarget - actual);
   const remainPro = Math.max(0, proteinTarget - actualProtein);
 
-  // 进度颜色（深色系）：绿 → 黄 → 红（按摄入占比）；轨道用对应浅色
+  // 进度颜色（深色系）：≤100% 正常色（热量绿 / 蛋白质橘），>100% 超标红
+  // 圆环进度线与中心文字共用同一函数、同一百分比（已摄入 ÷ 目标），保证逻辑一致
   function deepColorFor(pct, kind) {
-    if (pct >= 100) return "#b91c1c";
-    if (pct >= 80) return "#b45309";
+    if (pct > 100) return "#b91c1c";
     return kind === "cal" ? "#2d6a4f" : "#e76f51";
   }
   const calPct = displayTarget > 0 ? (actual / displayTarget) * 100 : 0;
